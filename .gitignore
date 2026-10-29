@@ -1,0 +1,26 @@
+# Build
+target/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# Logs
+*.log
+logs/
+
+# Segredos
+.env
+.env.*
+*.pem
+*.key
+application-local.yml
+application-secret*.yml
+
+# SO
+.DS_Store
+Thumbs.db

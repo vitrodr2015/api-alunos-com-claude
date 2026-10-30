@@ -1,11 +1,12 @@
 package br.com.vitor.apicrud_alunos.service;
 
+import java.time.LocalDate;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeSet;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,14 +32,23 @@ public class AlunoService {
 			"email", Comparator.comparing(Aluno::getEmail, String.CASE_INSENSITIVE_ORDER),
 			"dataNascimento", Comparator.comparing(Aluno::getDataNascimento));
 
-	private final Map<Long, Aluno> alunos = new LinkedHashMap<>();
+	private final List<Aluno> alunos = new CopyOnWriteArrayList<>();
 	private long proximoId = 1;
+
+	// Registros fixos, para a API já nascer com dados
+	public AlunoService() {
+		semear("Ana Souza", "ana.souza@escola.com", LocalDate.of(2000, 5, 10));
+		semear("Bruno Lima", "bruno.lima@escola.com", LocalDate.of(1999, 3, 21));
+		semear("Carla Dias", "carla.dias@escola.com", LocalDate.of(2001, 11, 2));
+		semear("Diego Martins", "diego.martins@escola.com", LocalDate.of(1998, 7, 15));
+		semear("Eduarda Costa", "eduarda.costa@escola.com", LocalDate.of(2002, 1, 30));
+	}
 
 	public synchronized Aluno criar(Aluno novo) {
 		validarEmailDisponivel(novo.getEmail(), null);
 		novo.setId(proximoId++);
 		novo.setAtivo(true);
-		alunos.put(novo.getId(), novo);
+		alunos.add(novo);
 		log.info("POST /alunos - aluno criado com id={}", novo.getId());
 		return novo;
 	}
@@ -53,7 +63,7 @@ public class AlunoService {
 		Comparator<Aluno> ordenacao = ordenacao(sort);
 		String filtroNome = nome == null ? "" : nome.trim().toLowerCase(Locale.ROOT);
 
-		List<Aluno> filtrados = alunos.values().stream()
+		List<Aluno> filtrados = alunos.stream()
 				.filter(a -> a.getNome().toLowerCase(Locale.ROOT).contains(filtroNome))
 				.filter(a -> ativo == null || a.isAtivo() == ativo)
 				.sorted(ordenacao.thenComparing(Aluno::getId))
@@ -68,11 +78,10 @@ public class AlunoService {
 
 	public synchronized Aluno buscar(Long id) {
 		validarId(id);
-		Aluno aluno = alunos.get(id);
-		if (aluno == null) {
-			throw new ResourceNotFoundException("Aluno não encontrado com id=" + id);
-		}
-		return aluno;
+		return alunos.stream()
+				.filter(a -> a.getId().equals(id))
+				.findFirst()
+				.orElseThrow(() -> new ResourceNotFoundException("Aluno não encontrado com id=" + id));
 	}
 
 	public synchronized Aluno atualizar(Long id, Aluno dados) {
@@ -100,9 +109,17 @@ public class AlunoService {
 	}
 
 	public synchronized void remover(Long id) {
-		buscar(id);
-		alunos.remove(id);
+		alunos.remove(buscar(id));
 		log.info("DELETE /alunos/{} - aluno removido", id);
+	}
+
+	private void semear(String nome, String email, LocalDate dataNascimento) {
+		Aluno aluno = new Aluno();
+		aluno.setId(proximoId++);
+		aluno.setNome(nome);
+		aluno.setEmail(email);
+		aluno.setDataNascimento(dataNascimento);
+		alunos.add(aluno);
 	}
 
 	private void validarId(Long id) {
@@ -112,7 +129,7 @@ public class AlunoService {
 	}
 
 	private void validarEmailDisponivel(String email, Long idAtual) {
-		boolean emUso = alunos.values().stream()
+		boolean emUso = alunos.stream()
 				.anyMatch(a -> !a.getId().equals(idAtual) && a.getEmail().equalsIgnoreCase(email));
 		if (emUso) {
 			throw new ConflictException("Já existe um aluno cadastrado com este e-mail");

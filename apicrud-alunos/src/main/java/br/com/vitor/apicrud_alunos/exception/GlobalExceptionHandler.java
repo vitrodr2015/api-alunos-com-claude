@@ -71,9 +71,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 			case HttpMessageNotReadableException _ -> "Corpo da requisição ausente ou ilegível";
 			case MissingServletRequestParameterException e -> "O parâmetro '" + e.getParameterName() + "' é obrigatório";
 			case HttpRequestMethodNotSupportedException _ -> "Método HTTP não permitido nesta rota";
-			case HttpMediaTypeNotSupportedException _ -> "Formato do corpo não suportado. Envie application/json";
+			case HttpMediaTypeNotSupportedException _ ->
+				"Formato do corpo não suportado. Envie application/json, application/xml ou application/yaml";
 			case HttpMediaTypeNotAcceptableException _ ->
-				"Formato de resposta não suportado. Esta API responde application/json";
+				"Formato de resposta não suportado. Esta API responde application/json, application/xml ou application/yaml";
 			case NoResourceFoundException _ -> "Rota não encontrada";
 			default -> body instanceof ProblemDetail problem && problem.getDetail() != null
 					? problem.getDetail()

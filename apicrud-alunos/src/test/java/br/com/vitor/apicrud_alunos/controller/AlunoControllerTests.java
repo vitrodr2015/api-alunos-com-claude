@@ -14,23 +14,43 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Import;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.jayway.jsonpath.JsonPath;
 
-import br.com.vitor.apicrud_alunos.exception.GlobalExceptionHandler;
-import br.com.vitor.apicrud_alunos.mapper.AlunoMapper;
-import br.com.vitor.apicrud_alunos.service.AlunoService;
-
-@WebMvcTest(AlunoController.class)
-@Import({ AlunoService.class, AlunoMapper.class, GlobalExceptionHandler.class })
+@SpringBootTest
+@AutoConfigureMockMvc
 class AlunoControllerTests {
 
 	@Autowired
 	private MockMvc mockMvc;
+
+	// ---------- registros fixos ----------
+
+	@Test
+	void registrosFixosExistemAoSubirAAplicacao() throws Exception {
+		mockMvc.perform(get("/alunos/1"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.nome").value("Ana Souza"))
+				.andExpect(jsonPath("$.email").value("ana.souza@escola.com"))
+				.andExpect(jsonPath("$.dataNascimento").value("2000-05-10"))
+				.andExpect(jsonPath("$.ativo").value(true));
+		mockMvc.perform(get("/alunos/5"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.nome").value("Eduarda Costa"));
+		mockMvc.perform(get("/alunos").param("nome", "souza"))
+				.andExpect(jsonPath("$.content[0].id").value(1));
+	}
+
+	@Test
+	void emailDeRegistroFixoJaEstaEmUso() throws Exception {
+		mockMvc.perform(post("/alunos").contentType(MediaType.APPLICATION_JSON)
+				.content(corpo("Outra Ana", "ana.souza@escola.com", "2000-05-10")))
+				.andExpect(status().isConflict());
+	}
 
 	// ---------- POST /alunos ----------
 

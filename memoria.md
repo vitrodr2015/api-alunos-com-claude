@@ -38,6 +38,12 @@ Arquivo para retomar o contexto se a conversa for perdida. Ler junto com `PassoA
 
 - Coleção e ambiente do Postman em `postman/` (raiz do repositório), com 10 alunos de exemplo. Validados contra a aplicação rodando (36 requisições ok).
 
+- `AlunoService` usa `CopyOnWriteArrayList` e já sobe com 5 alunos fixos (ids 1 a 5, os 5 primeiros da carga do Postman). `AlunoControllerTests` é `@SpringBootTest` + `@AutoConfigureMockMvc`.
+
+- Boot 4 / Spring 7 usa Jackson 3 (`tools.jackson`): não seguir literalmente receitas do Jackson 2 (`AbstractJackson2HttpMessageConverter`, `com.fasterxml`). Conversores de XML e YAML já existem no Spring; `WebConfig` define JSON como padrão e faz o YAML aceitar também `application/x-yaml`.
+- Erros da API (`ErrorResponse`) ficam sempre em JSON, mesmo com `Accept` de XML/YAML.
+- Em ambiente com permissão automática, `npx` baixando pacote externo (ex.: newman) é bloqueado; usar scripts locais.
+
 ## Pendências
 
 - Decidir o destino do `HELP.md`.
@@ -51,4 +57,4 @@ Arquivo para retomar o contexto se a conversa for perdida. Ler junto com `PassoA
 
 - Último commit: `69152c9` – Configurações iniciais (já enviado ao GitHub).
 - Sem commit: estrutura de camadas, pacote `exception`, os 7 endpoints (model, dto, mapper, service, controller), `pom.xml` com `spring-boot-starter-validation`, testes, `PassoAPasso.md`, `memoria.md`.
-- `.\mvnw test`: 34 testes passando.
+- `.\mvnw test`: 46 testes passando.

@@ -122,6 +122,29 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - Como usar: Postman → Import → escolher os dois arquivos → selecionar o ambiente → subir a aplicação (`.\mvnw.cmd spring-boot:run`) → rodar pelo Runner.
 - Verificado com um script em Node que dispara as 36 requisições e confere o status esperado: 36 ok, 0 falhas.
 
+## 8. CRUD mockado com registros fixos e testes de integração
+
+- **Status:** concluído, ainda sem commit
+- `AlunoService` passou a guardar os alunos numa `CopyOnWriteArrayList` (antes era um mapa em memória).
+- A aplicação já sobe com 5 alunos fixos (ids 1 a 5): Ana Souza, Bruno Lima, Carla Dias, Diego Martins e Eduarda Costa. Os próximos criados começam no id 6.
+  - Na coleção do Postman, os 5 primeiros itens da carga inicial passam a responder 409 (e-mail já existe); os 5 últimos criam normalmente.
+- `AlunoControllerTests` agora usa `@SpringBootTest` + `@AutoConfigureMockMvc` (antes `@WebMvcTest`), com a aplicação inteira. Cobre busca, listagem, criação, atualização, remoção, 404 e 400, mais os registros fixos. 24 testes no total; a suíte inteira tem 36, todos passando.
+
+## 9. Respostas em JSON, XML e YAML
+
+- **Status:** concluído, ainda sem commit
+- O formato vem do cabeçalho `Accept`: `application/json`, `application/xml`, `application/yaml` ou `application/x-yaml`. Sem `Accept` (ou com `*/*`), a resposta é JSON.
+- Dependências novas no `pom.xml`: `tools.jackson.dataformat:jackson-dataformat-xml` e `jackson-dataformat-yaml`. O Spring Boot 4 usa o Jackson 3, que mudou de pacote (`tools.jackson`), com versão gerenciada pelo próprio Boot.
+- Diferença para o playbook: ele pede uma classe própria que estende `AbstractJackson2HttpMessageConverter` e um `YAMLMapper`. Isso era do Jackson 2 / Spring 6. No Spring 7 o conversor de YAML (`JacksonYamlHttpMessageConverter`) já vem pronto e é registrado sozinho, só com a dependência; o XML também. Por isso não criei conversor.
+- `config/WebConfig`:
+  - `configureContentNegotiation` com `defaultContentType(MediaType.APPLICATION_JSON)`.
+  - `extendMessageConverters` faz o conversor de YAML aceitar também `application/x-yaml` (por padrão ele só aceita `application/yaml`).
+- Datas saem como texto (`2000-05-10`) nos três formatos: o Jackson 3 já não escreve datas como número por padrão, então não foi preciso mexer em `WRITE_DATES_AS_TIMESTAMPS`.
+- O corpo das requisições (`POST`/`PUT`) também pode ser enviado em XML ou YAML, pelo `Content-Type`.
+- Os erros (`ErrorResponse`) continuam sempre em JSON, mesmo quando o cliente pede XML ou YAML.
+- Na lista paginada em XML, a lista aparece como `<content><content>...</content></content>` (um elemento embrulhando os itens). É funcional; dá para limpar depois.
+- Testes: `ContentNegotiationTests` (10) cobre os formatos, o padrão sem `Accept`, as datas, o corpo em XML/YAML e o erro em JSON. A suíte inteira tem 46 testes, todos passando.
+
 ## Próximos passos
 
 - Commitar o que está pendente (camadas, tratamento de erros, endpoints, `.md`).

@@ -54,6 +54,7 @@ Registro, na ordem em que foram feitos, dos passos seguidos neste projeto.
   | qualquer outro erro | 500, mensagem genérica; o detalhe e o stack trace só vão para o log |
 
 - A resposta de erro é sempre `application/json`, mesmo quando o cliente pede outro `Accept`.
+- Os campos `erro` e `mensagem` saem em português, inclusive nos erros do próprio Spring (ex.: `"erro": "Não encontrado"`, `"mensagem": "O valor 'abc' é inválido para 'id'"`).
 - Teste: `GlobalExceptionHandlerTests` (`@WebMvcTest` com um controller falso dentro do próprio teste) cobre 400, 404, 405, 406, 409, 415 e 500. Resultado: 11 testes passando, mais o `contextLoads`.
 - Ficam para depois:
   - 400 por ordenação em campo inexistente e por validação de campos (`@Valid`): dependem de repository e do starter de validação.
@@ -108,6 +109,18 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - `GlobalExceptionHandler` ganhou a mensagem de validação do corpo, que lista os campos inválidos, ex.: `email: deve ser um e-mail válido; nome: deve ter de 3 a 100 caracteres`.
 - Logs SLF4J no service: uma linha `info` por operação de escrita, só com o id (sem nome, e-mail ou data de nascimento).
 - Testes: `AlunoControllerTests` (22 testes) cobre os 7 endpoints e os status 200, 201, 204, 400, 404 e 409. Total da suíte: 34 testes passando.
+
+## 7. Coleção do Postman
+
+- **Status:** concluído, ainda sem commit
+- Pasta `postman/` na raiz do repositório:
+  - `api-alunos.postman_collection.json`: coleção com 3 pastas.
+    - `0 - Carga inicial (10 alunos)`: 10 `POST` com alunos de exemplo (pode rodar de novo; o que já existe responde 409).
+    - `1 - CRUD de alunos`: os 7 endpoints em sequência (o primeiro item guarda o id em `{{alunoId}}`; o último remove o aluno).
+    - `2 - Erros esperados`: 400, 404, 405, 409 e 415, conferindo o formato `ErrorResponse`.
+  - `api-alunos-local.postman_environment.json`: ambiente `API Alunos - Local` com `baseUrl` (`http://localhost:8080`), `alunoId` e variáveis de e-mail preenchidas pelos scripts.
+- Como usar: Postman → Import → escolher os dois arquivos → selecionar o ambiente → subir a aplicação (`.\mvnw.cmd spring-boot:run`) → rodar pelo Runner.
+- Verificado com um script em Node que dispara as 36 requisições e confere o status esperado: 36 ok, 0 falhas.
 
 ## Próximos passos
 

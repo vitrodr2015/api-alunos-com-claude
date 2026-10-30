@@ -33,6 +33,11 @@ Arquivo para retomar o contexto se a conversa for perdida. Ler junto com `PassoA
 - Mapper escrito à mão (`AlunoMapper`), sem MapStruct/Dozer; o playbook sugere uma das duas libs, o usuário ainda não escolheu.
 - Mensagens de validação (`@NotBlank` etc.) ficam fixas em português nas anotações, para não depender do idioma do JVM.
 
+- Todas as mensagens de erro da API (`erro` e `mensagem`) são em português, inclusive as do Spring, traduzidas no `GlobalExceptionHandler`.
+- Todos os endpoints foram testados com curl na aplicação rodando (porta 8080) em 2026-10-29; tudo conforme o contrato.
+
+- Coleção e ambiente do Postman em `postman/` (raiz do repositório), com 10 alunos de exemplo. Validados contra a aplicação rodando (36 requisições ok).
+
 ## Pendências
 
 - Decidir o destino do `HELP.md`.

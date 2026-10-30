@@ -5,16 +5,23 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 @RestControllerAdvice
@@ -59,9 +66,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
 			HttpStatusCode statusCode, WebRequest request) {
 		HttpStatus status = HttpStatus.valueOf(statusCode.value());
-		String message = body instanceof ProblemDetail problem && problem.getDetail() != null
-				? problem.getDetail()
-				: status.getReasonPhrase();
+		String message = switch (ex) {
+			case TypeMismatchException e -> "O valor '" + e.getValue() + "' é inválido para '" + e.getPropertyName() + "'";
+			case HttpMessageNotReadableException _ -> "Corpo da requisição ausente ou ilegível";
+			case MissingServletRequestParameterException e -> "O parâmetro '" + e.getParameterName() + "' é obrigatório";
+			case HttpRequestMethodNotSupportedException _ -> "Método HTTP não permitido nesta rota";
+			case HttpMediaTypeNotSupportedException _ -> "Formato do corpo não suportado. Envie application/json";
+			case HttpMediaTypeNotAcceptableException _ ->
+				"Formato de resposta não suportado. Esta API responde application/json";
+			case NoResourceFoundException _ -> "Rota não encontrada";
+			default -> body instanceof ProblemDetail problem && problem.getDetail() != null
+					? problem.getDetail()
+					: descricao(status);
+		};
 		return ResponseEntity.status(status).headers(headers).contentType(MediaType.APPLICATION_JSON)
 				.body(toResponse(status, message));
 	}
@@ -71,7 +88,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	}
 
 	private ErrorResponse toResponse(HttpStatus status, String message) {
-		return new ErrorResponse(Instant.now(), status.value(), status.getReasonPhrase(), message);
+		return new ErrorResponse(Instant.now(), status.value(), descricao(status), message);
+	}
+
+	private String descricao(HttpStatus status) {
+		return switch (status) {
+			case BAD_REQUEST -> "Requisição inválida";
+			case NOT_FOUND -> "Não encontrado";
+			case METHOD_NOT_ALLOWED -> "Método não permitido";
+			case NOT_ACCEPTABLE -> "Formato não aceito";
+			case CONFLICT -> "Conflito";
+			case UNSUPPORTED_MEDIA_TYPE -> "Tipo de conteúdo não suportado";
+			case INTERNAL_SERVER_ERROR -> "Erro interno";
+			default -> status.getReasonPhrase();
+		};
 	}
 
 }

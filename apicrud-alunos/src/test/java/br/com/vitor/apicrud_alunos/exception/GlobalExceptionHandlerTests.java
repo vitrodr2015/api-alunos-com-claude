@@ -32,7 +32,7 @@ class GlobalExceptionHandlerTests {
 		mockMvc.perform(get("/fake/nao-encontrado"))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.status").value(404))
-				.andExpect(jsonPath("$.erro").value("Not Found"))
+				.andExpect(jsonPath("$.erro").value("Não encontrado"))
 				.andExpect(jsonPath("$.mensagem").value("Aluno não encontrado"))
 				.andExpect(jsonPath("$.dataHora").exists());
 	}
@@ -57,14 +57,16 @@ class GlobalExceptionHandlerTests {
 	void idComTipoErradoRetorna400() throws Exception {
 		mockMvc.perform(get("/fake/abc"))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.status").value(400));
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.mensagem").value("O valor 'abc' é inválido para 'id'"));
 	}
 
 	@Test
 	void parametroAusenteRetorna400() throws Exception {
 		mockMvc.perform(get("/fake/parametro"))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.status").value(400));
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.mensagem").value("O parâmetro 'nome' é obrigatório"));
 	}
 
 	@Test

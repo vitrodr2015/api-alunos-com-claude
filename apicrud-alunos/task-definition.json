@@ -1,0 +1,70 @@
+{
+    "family": "crud-alunos-task-definition",
+    "containerDefinitions": [
+        {
+            "name": "container-crudalunos",
+            "image": "164801376891.dkr.ecr.us-east-1.amazonaws.com/respositorio-crud-alunos:latest",
+            "cpu": 0,
+            "portMappings": [
+                {
+                    "containerPort": 8080,
+                    "hostPort": 8080,
+                    "protocol": "tcp",
+                    "name": "container-crudalunos-8080-tcp",
+                    "appProtocol": "http"
+                }
+            ],
+            "essential": true,
+            "environment": [
+                {
+                    "name": "DB_USER",
+                    "value": "root"
+                },
+                {
+                    "name": "TZ",
+                    "value": "America/Sao_Paulo"
+                },
+                {
+                    "name": "DB_URL",
+                    "value": "jdbc:mysql://database-crud-alunos.c89mukay8yx1.us-east-1.rds.amazonaws.com:3306/crud_alunos?createDatabaseIfNotExist=true"
+                }
+            ],
+            "environmentFiles": [],
+            "mountPoints": [],
+            "volumesFrom": [],
+            "secrets": [
+                {
+                    "name": "DB_PASSWORD",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-1:164801376891:secret:secrets_crud_alunos/db-password-YxLWlR"
+                }
+            ],
+            "ulimits": [],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/crud-alunos-task-definition",
+                    "awslogs-create-group": "true",
+                    "awslogs-region": "us-east-1",
+                    "awslogs-stream-prefix": "ecs"
+                },
+                "secretOptions": []
+            },
+            "systemControls": []
+        }
+    ],
+    "executionRoleArn": "arn:aws:iam::164801376891:role/ecsTaskExecutionRole",
+    "networkMode": "awsvpc",
+    "volumes": [],
+    "placementConstraints": [],
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "cpu": "1024",
+    "memory": "3072",
+    "runtimePlatform": {
+        "cpuArchitecture": "X86_64",
+        "operatingSystemFamily": "LINUX"
+    },
+    "enableFaultInjection": false,
+    "tags": []
+}

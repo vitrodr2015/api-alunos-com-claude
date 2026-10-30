@@ -4,6 +4,8 @@ Arquivo para retomar o contexto se a conversa for perdida. Ler junto com `PassoA
 
 ## Como trabalhamos
 
+- **Objetivo final do usuário:** montar um playbook com tudo o que foi feito, passo a passo, desde o início deste CRUD de alunos. Por isso, **a cada passo concluído, registrar no `PassoAPasso.md`** (ordem cronológica, decisões e o porquê) e, para a parte AWS, também no `Duvida-CICD.md` (diferenças de tela). Não depender da memória da conversa: os arquivos são a fonte.
+
 - O usuário segue um playbook com passos numerados e cola o trecho de cada passo na conversa.
 - Respostas em português. O usuário é iniciante em Spring, então explicar o que cada coisa é.
 - Commit e push só quando o usuário pedir.
@@ -44,6 +46,14 @@ Arquivo para retomar o contexto se a conversa for perdida. Ler junto com `PassoA
 - Erros da API (`ErrorResponse`) ficam sempre em JSON, mesmo com `Accept` de XML/YAML.
 - Em ambiente com permissão automática, `npx` baixando pacote externo (ex.: newman) é bloqueado; usar scripts locais.
 
+- Serialização padronizada com `@JsonPropertyOrder`/`@JsonFormat` nos DTOs (datas `yyyy-MM-dd`; `dataHora` do erro em UTC com milissegundos). Sem `@JsonSerialize` por enquanto. Lista no XML sai como `<content><item>`.
+
+- `Duvida-CICD.md` (raiz) registra dúvidas, erros e diferenças do tutorial `AWS-Esteira CICD.md`, para virar um tutorial novo. O arquivo segue o formato do tutorial: seções com o mesmo número e título (ex.: `## 1. Criar o banco MySQL (RDS)`), passo a passo corrigido, tabelas e avisos; dúvidas sem resposta ficam na tabela "Dúvidas abertas". Atualizar a seção correspondente a cada dúvida, erro ou atualização da AWS (não criar entradas soltas por data). O usuário segue o tutorial por conta própria e pede ajuda quando travar. O arquivo deve ter **só o que já foi executado** (hoje: seção 1, RDS); itens de seções futuras ficam aqui no `memoria.md` até serem executados.
+- Nomes reais do usuário na AWS (todos diferentes do tutorial): banco `database-crud-alunos`, repositório ECR `respositorio-crud-alunos` (sem o "i"; decisão manter/recriar pendente), usuário IAM `GITHUB_ACTIONS_CRUD_ALUNOS`, cluster `cluster-crud-alunos`, secret `secrets_crud_alunos/db-password`. Seções 1 a 5 feitas (política inline `LerSecretDB_CrudAlunos` na Task execution role; confirmar na seção 7 que a Task Definition usa essa mesma role); a política tem Resource `arn:aws:secretsmanager:us-east-1:<conta>:secret:secrets_crud_alunos/db-password-*` (manter o `-*`).
+- Seção 7.1 feita: Task Definition `crud-alunos-task-definition:1`, contêiner `container-crudalunos`, porta 8080, variáveis `DB_USER`, `TZ`, `DB_PASSWORD` (deve ser ValueFrom) e `DB_URL`. O database dentro do RDS será `crud_alunos` (não o `rest_udemy` do tutorial), criado pela aplicação via `createDatabaseIfNotExist=true`. A aplicação precisa ler `DB_URL`, `DB_USER` e `DB_PASSWORD` no `application.yml` (ainda não implementado). JSON da revisão `:1` conferido e correto (secrets/ValueFrom, DB_URL, Fargate 1 vCPU/3 GB, role de execução `ecsTaskExecutionRole`, imagem sem tag = latest). Falta confirmar que a `ecsTaskExecutionRole` tem a política `LerSecretDB_CrudAlunos` e `logs:CreateLogGroup`. O console está sendo usado como usuário raiz (anotado em Dúvidas abertas). Próximos: 7.2 (`task-definition.json`), 8 (imagem no ECR; precisa de Dockerfile), 9 (Service), 10 a 15.
+- `Dockerfile` e `.dockerignore` criados em `apicrud-alunos/` (2 fases, Java 25) e testados localmente (imagem local `crud-alunos-local`, 521 MB). Docker 29.8.1 e AWS CLI 2.38.4 estão instalados na máquina. Próximo: seção 8 (login no ECR, `docker tag`/`push` para `respositorio-crud-alunos:latest`, com `aws configure --profile crud-alunos`), depois seção 9 com Desired tasks = 1.
+- Notas para as seções futuras do tutorial (ainda não executadas): (a) seção 6 feita: grupo da aplicação `security-group-crud-alunos` (`sg-0995364797259db79`); o `default` do RDS (`sg-0511fa5538e05f367`) aceita a 3306 de ele, do IP do usuário (`Vitor-casa`) e do `rest-with-claude-app-sg` (`sg-07ab47b5b7340252c`, sobra de tentativa anterior; decidir apagar); (b) seção 7: a Task Definition do tutorial não passa o endereço do banco; o projeto ainda não tem datasource, Dockerfile, `task-definition.json` nem workflow; propor `DB_URL` por variável de ambiente; (c) antes da seção 11: a pasta `.github/` aparece ignorada pelo Git (`git check-ignore -v .github`).
+
 ## Pendências
 
 - Decidir o destino do `HELP.md`.
@@ -57,4 +67,4 @@ Arquivo para retomar o contexto se a conversa for perdida. Ler junto com `PassoA
 
 - Último commit: `69152c9` – Configurações iniciais (já enviado ao GitHub).
 - Sem commit: estrutura de camadas, pacote `exception`, os 7 endpoints (model, dto, mapper, service, controller), `pom.xml` com `spring-boot-starter-validation`, testes, `PassoAPasso.md`, `memoria.md`.
-- `.\mvnw test`: 46 testes passando.
+- `.\mvnw test`: 52 testes passando.

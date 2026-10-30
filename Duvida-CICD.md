@@ -1,0 +1,317 @@
+# Duvida - CICD
+
+# 🔧 Dúvidas e atualizações do tutorial: Deploy na AWS (RDS + ECR + ECS Fargate)
+
+> 💡 **Objetivo:** registrar o que está **diferente** do `AWS-Esteira CICD.md` no console atual da AWS, na mesma ordem das seções do tutorial. Aqui entra **somente o que já foi executado**. No fim, serve de base para um tutorial novo e corrigido.
+
+> 💡 *Como usar:* a cada seção do tutorial que for executada, acrescente aqui a seção com o mesmo número e título, com o passo a passo como está no console hoje. Dúvidas sem resposta vão em **Dúvidas abertas**.
+
+---
+
+## Valores usados (nossos, diferentes do tutorial)
+
+| **Item** | **Tutorial** | **Nosso** |
+| --- | --- | --- |
+| **Banco RDS** | `vitrodr-db-server` | `database-crud-alunos` |
+| **Usuário do banco** | `root` | `root` (aceito pelo console) |
+| **Database (schema) dentro do servidor** | `rest_udemy` | `crud_alunos` (criado pela aplicação, ver seção 1) |
+| **Repositório ECR** | `rest-with-claude` | `respositorio-crud-alunos` (nome com erro de digitação, ver Dúvidas abertas) |
+| **Usuário IAM da esteira** | `GITHUB_ACTIONS` | `GITHUB_ACTIONS_CRUD_ALUNOS` |
+| **Cluster ECS** | `rest-with-claude-spring` | `cluster-crud-alunos` |
+| **Secret da senha do banco** | `rest-with-claude/db-password` | `secrets_crud_alunos/db-password` |
+| **Política de leitura do secret** | `LerSecretDB` | `LerSecretDB_CrudAlunos` |
+| **Security group da aplicação** | `rest-with-claude-app-sg` | `security-group-crud-alunos` |
+| **Task Definition (family)** | `rest-with-claude-spring-taskdefinition` | `crud-alunos-task-definition` (revisão `:1`) |
+| **Contêiner** | `Container-vitrodr` | `container-crudalunos` |
+| **Log group** | `/ecs/rest-with-claude-spring-taskdefinition` | `/ecs/crud-alunos-task-definition` |
+| **Role de execução da task** | `ECS-role-bd3e720b` ou `ecsTaskExecutionRole` | `ecsTaskExecutionRole` |
+| **Classe da instância** | `db.t4g.micro` | `db.t4g.micro` |
+
+## Andamento
+
+| **Seção** | **Situação** |
+| --- | --- |
+| 1. Criar o banco MySQL (RDS) | ✅ Feita (banco **Available**) |
+| 2. Criar o repositório de imagens (ECR) | ✅ Feita (repositório criado) |
+| 3. Criar os usuários de acesso (IAM) | ✅ Feita (usuário e chave de acesso criados) |
+| 4. Criar o cluster (ECS) | ✅ Feita (cluster criado) |
+| 5.1 Criar o secret (Secrets Manager) | ✅ Feita (secret criado) |
+| 5.2 Permitir a leitura do secret | ✅ Feita (política `LerSecretDB_CrudAlunos` criada) |
+| 6.1 Criar o security group da aplicação | ✅ Feita (`security-group-crud-alunos`) |
+| 6.2 Liberar a aplicação no banco | ✅ Feita (regra 3306 salva no grupo `default`) |
+| 7.1 Criar a Task Definition | ✅ Feita e conferida pelo JSON (`crud-alunos-task-definition:1`) |
+| 7.2 Exportar o JSON para a esteira | ✅ Feita (`apicrud-alunos/task-definition.json`, ainda sem commit) |
+
+---
+
+## 1. Criar o banco MySQL (RDS)
+
+**Passo a passo como está no console hoje** (validado; o banco foi criado):
+
+1. Busque **Aurora and RDS** → **Databases** → **Create database**.
+2. Em **Choose a database creation method**, escolha **Full configuration**. *(Antes: "Standard create". Hoje o padrão vem em **Easy create**.)*
+3. Em **Engine options**, clique em **MySQL**. Deixe a versão sugerida (MySQL Community 8.4.11). *(O engine que vem selecionado é **Aurora**: não use.)*
+4. Em **Templates**, escolha **Sandbox**. *(Antes: "Free tier". As opções agora são Production, Dev/Test e Sandbox.)*
+5. Em **Availability and durability**, escolha **Single-AZ DB instance deployment (1 instance)**. *(Seção nova. As outras duas opções criam réplicas e multiplicam o custo.)*
+6. Em **Settings**:
+    - **DB instance identifier:** o nome do banco (tutorial: `vitrodr-db-server`; o nosso: `database-crud-alunos`).
+    - **Master username:** `root`.
+    - **Credentials management:** **Self managed**. *(A opção "Managed in AWS Secrets Manager" vem primeiro e tem custo extra.)*
+    - **Master password:** crie uma senha forte e anote fora do Git.
+7. Em **Instance configuration**, marque o filtro **Burstable classes (includes t classes)** e escolha **`db.t4g.micro`**. *(O padrão é `db.m7g.large`.)*
+8. Em **Storage**, deixe **gp3** e troque **Allocated storage** de 200 para **20** GiB.
+9. Em **Connectivity**:
+    - **Compute resource:** **Don't connect to an EC2 compute resource**. *(Opção nova.)*
+    - **Public access:** **Yes**.
+    - **VPC security group:** **Choose existing** e o grupo **default**.
+    - **RDS Proxy:** deixe desmarcado (custo extra).
+10. Em **Monitoring**, escolha **Database Insights - Standard** (grátis, 7 dias). Deixe **Enhanced Monitoring** e **Log exports** desmarcados.
+11. Role até o fim e abra a seção recolhida **Additional configuration** (a que lista "Database options, encryption turned on, backup turned on..."). Em **Initial database name**, digite o nome do database. *(No nosso caso o database **não foi criado** neste passo: ele é criado pela própria aplicação na primeira conexão, com `createDatabaseIfNotExist=true` na `DB_URL`, e o nome escolhido foi `crud_alunos`. Ver seção 7.)*
+12. Confira o **Estimated monthly costs** no fim da página e clique em **Create database**. Aguarde o **Status** ficar **Available**.
+13. Clique no nome do banco → aba **Connectivity & security**. No painel **Connect using**, clique em **Endpoints** para ver o **Endpoint** e a porta `3306`. *(Ele também aparece dentro do comando `mysql -h <endpoint> -P 3306 -u root -p ...`. Não há mais o campo "Endpoint & port" em destaque.)*
+
+> 💰 **Custo:** com os valores padrão (`db.m7g.large` e 200 GiB) a estimativa era de **145,64 USD/mês** (instância 122,64 + disco 23,00). O Aurora Dev/Test da primeira tela custa 0,276 USD **por hora**. Confira sempre o *Estimated monthly costs* antes de criar.
+
+> ⚠️ Se tiver criado um cluster Aurora em tentativas anteriores, confira em **Databases** que não sobrou nenhum ligado.
+
+> 🔒 O endpoint não é segredo por si só, mas **não o grave no código**: ele entra por variável de ambiente. A senha **nunca** vai para o Git nem para mensagens.
+
+**Para o tutorial novo:** trocar "Standard create" por "Full configuration"; "Free tier" por "Sandbox"; incluir a escolha Single-AZ; mandar trocar o disco de 200 para 20 GiB; mostrar onde fica o endpoint e o "Initial database name"; incluir Compute resource, RDS Proxy e Database Insights; deixar claro que o nome do banco é livre.
+
+---
+
+## 2. Criar o repositório de imagens (ECR)
+
+**Passo a passo executado** (nenhuma diferença de tela relatada em relação ao tutorial):
+
+1. Busque **Elastic Container Registry** e clique.
+2. No menu da esquerda, clique em **Repositories** → **Create repository**.
+3. **Visibility settings:** **Private**.
+4. **Repository name:** o nome do repositório (tutorial: `rest-with-claude`; o nosso: `respositorio-crud-alunos`).
+5. Deixe o resto como está e clique em **Create repository**.
+6. Anote o **URI**: `<id-da-conta>.dkr.ecr.us-east-1.amazonaws.com/<nome-do-repositório>`.
+
+> ⚠️ O nome do repositório **não pode ser alterado** depois de criado. Ele é usado igual na Task Definition (seção 7), nos comandos `docker tag`/`docker push` (seção 8) e no workflow da esteira. Se o nome mudar, mude em todos esses lugares.
+
+**Para o tutorial novo:** avisar que o nome do repositório é livre mas fixo, e listar os lugares onde ele reaparece.
+
+---
+
+## 3. Criar os usuários de acesso (IAM)
+
+**Passo a passo executado** (validado; nenhuma diferença de tela relatada em relação ao tutorial):
+
+> ⚠️ A esteira precisa de um usuário próprio, com poucas permissões. **Nunca** use o administrador na esteira.
+
+### 3.1 Criar o usuário da esteira
+
+1. Busque **IAM** e clique.
+2. No menu da esquerda, clique em **Users** → **Create user**.
+3. **User name:** o nome do usuário (tutorial: `GITHUB_ACTIONS`; o nosso: `GITHUB_ACTIONS_CRUD_ALUNOS`). **Não** marque "Provide user access to the AWS Management Console". Clique em **Next**.
+4. Escolha **Attach policies directly**.
+5. Na caixa de busca, procure e **marque** estas duas:
+    - `AmazonEC2ContainerRegistryFullAccess`
+    - `AmazonECS_FullAccess`
+6. Clique em **Next** → **Create user**.
+
+### 3.2 Gerar a chave de acesso
+
+1. Na lista de usuários, clique no usuário criado.
+2. Abra a aba **Security credentials**.
+3. Role até **Access keys** e clique em **Create access key**.
+4. Escolha **Application running outside AWS**, marque a caixa de confirmação e clique em **Next**.
+5. (Opcional) Descreva como `github-actions` e clique em **Create access key**.
+6. **Copie agora** a **Access key** e a **Secret access key** (clique em *Show*). A secret não aparece de novo. Guarde-as para a seção 11, onde são cadastradas no GitHub.
+
+> 🔒 **Nunca** cole essas chaves no código, em mensagens ou em arquivos do projeto. Elas não estão registradas neste arquivo.
+
+> 💡 O nome do usuário é livre. Só lembre dele na seção 14 (limpeza), onde as chaves sem uso devem ser apagadas.
+
+**Para o tutorial novo:** as duas políticas são do tipo *FullAccess*, mais amplas do que o aviso de "poucas permissões" sugere; avaliar políticas mais restritas. A AWS também costuma recomendar alternativas a chaves de longa duração para o GitHub Actions; avaliar no tutorial novo se faz sentido.
+
+---
+
+## 4. Criar o cluster (ECS)
+
+**Passo a passo executado** (validado; nenhuma diferença de tela relatada em relação ao tutorial):
+
+1. Busque **Elastic Container Service** e clique.
+2. No menu da esquerda, clique em **Clusters** → **Create cluster**.
+3. **Cluster name:** o nome do cluster (tutorial: `rest-with-claude-spring`; o nosso: `cluster-crud-alunos`).
+4. Em **Infrastructure**, deixe marcado **AWS Fargate (serverless)**.
+5. (Opcional) Em **Monitoring**, o *Container Insights* dá métricas, mas aumenta o custo. Para estudo, deixe desligado.
+6. Clique em **Create**. Aguarde a mensagem de sucesso.
+
+> ⚠️ O nome do cluster aparece de novo nas seções 9 (criar o Service), 15 (ligar e desligar) e no workflow da esteira. Use sempre o nome real do cluster.
+
+**Para o tutorial novo:** lembrar que o nome do cluster é livre e listar onde ele reaparece.
+
+---
+
+## 5. Guardar a senha do banco (Secrets Manager)
+
+> A senha não pode ficar no código nem na imagem. A aplicação a recebe do Secrets Manager.
+
+### 5.1 Criar o secret
+
+**Passo a passo executado** (validado; nenhuma diferença de tela relatada em relação ao tutorial):
+
+1. Busque **Secrets Manager** e clique.
+2. Clique em **Store a new secret**.
+3. **Secret type:** **Other type of secret**.
+4. Na parte **Key/value pairs**, clique na aba **Plaintext** e **apague** o conteúdo. Digite **apenas a senha** do RDS (sem aspas, sem chaves, sem espaço ou quebra de linha no fim).
+5. Clique em **Next**.
+6. **Secret name:** o nome do secret (tutorial: `rest-with-claude/db-password`; o nosso: `secrets_crud_alunos/db-password`). Clique em **Next** duas vezes (deixe a rotação desligada) e depois em **Store**.
+7. Abra o secret e anote o **Secret ARN**, que será usado na Task Definition (seção 7).
+
+> 🔒 A senha **não** está registrada neste arquivo, nem deve estar em qualquer arquivo do projeto.
+
+> ⚠️ O nome do secret reaparece no JSON da política de leitura (5.2) e no ARN de `DB_PASSWORD` na Task Definition (seção 7). Se o nome mudar, mude nos dois lugares.
+
+### 5.2 Permitir que a aplicação leia o secret
+
+**Passo a passo executado** (validado; nenhuma diferença de tela relatada em relação ao tutorial):
+
+1. Busque **IAM** → **Roles**.
+2. Na busca da lista, digite o nome da **Task execution role** (por exemplo `ecsTaskExecutionRole`) e clique nela.
+3. Na aba **Permissions**, clique em **Add permissions** → **Create inline policy**.
+4. Clique na aba **JSON**, apague tudo e cole (só a linha `Resource` muda em relação ao tutorial):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": "secretsmanager:GetSecretValue",
+    "Resource": "arn:aws:secretsmanager:us-east-1:<id-da-conta>:secret:secrets_crud_alunos/db-password-*"
+  }]
+}
+```
+
+5. Clique em **Next**. Em **Policy name**, digite o nome da política (tutorial: `LerSecretDB`; o nosso: `LerSecretDB_CrudAlunos`). Clique em **Create policy**.
+
+> ⚠️ Troque `<id-da-conta>` pelo ID da sua conta e mantenha o `-*` no final do `Resource`: a AWS acrescenta um sufixo aleatório ao ARN do secret.
+
+> 💡 A política precisa estar na **Task execution role** (a que o ECS usa para buscar o secret antes de iniciar o contêiner), e não na *Task role*.
+
+**Para o tutorial novo:** dizer que o nome do secret é livre e listar onde ele reaparece; avisar que não pode sobrar espaço ou quebra de linha na senha; deixar claro que a política vai na Task execution role e que só a linha `Resource` precisa ser trocada.
+
+---
+
+## 6. Criar o security group da aplicação
+
+> O security group é o "firewall" que libera as portas.
+
+### 6.1 Criar o grupo
+
+**Passo a passo executado** (validado):
+
+1. Busque **EC2** e clique.
+2. No menu da esquerda, em **Network & Security**, clique em **Security Groups** → **Create security group**.
+3. **Security group name:** o nome do grupo (tutorial: `rest-with-claude-app-sg`; o nosso: `security-group-crud-alunos`). Preencha também a **Description**.
+4. **VPC:** deixe a **default**.
+5. Em **Inbound rules**, clique em **Add rule**:
+    - **Type:** Custom TCP
+    - **Port range:** `8080`
+    - **Source:** Anywhere-IPv4 (`0.0.0.0/0`) no tutorial; **My IP** é mais seguro enquanto a API não tiver autenticação.
+6. Clique em **Create security group**.
+
+> ⚠️ O nome do grupo reaparece no 6.2 e na seção 9 (criar o Service). Use o nome real.
+
+### 6.2 Liberar a aplicação no banco
+
+**Passo a passo executado** (validado):
+
+1. Em **Security Groups**, ache o grupo **default** que o RDS usa (confira o ID: o do nosso banco é o `sg-0511fa5538e05f367`, porque pode haver mais de um grupo chamado `default`) e clique nele.
+2. Aba **Inbound rules** → **Edit inbound rules** → **Add rule**:
+    - **Type:** MYSQL/Aurora (porta `3306`)
+    - **Source:** **Custom**, depois **clique no grupo da aplicação na lista suspensa** (ou cole o ID `sg-...` dele). *(Só digitar o nome não funciona: o console mostra o erro "CIDR block, a security group ID or a prefix list has to be specified".)*
+    - **Description:** opcional (usamos `Crud-Alunos`).
+3. (Opcional) Acesso do seu computador (HeidiSQL, por exemplo): regra **MYSQL/Aurora** com **Source: My IP**. *(No nosso caso essa regra já existia, com a descrição `Vitor-casa`, e não foi preciso criar outra.)*
+4. **Remova qualquer regra com origem `0.0.0.0/0` na porta 3306.** *(Não havia nenhuma.)*
+5. Clique em **Save rules**. A mensagem esperada é "Inbound security group rules successfully modified".
+
+Ao final, a porta 3306 do grupo `default` ficou com estas origens:
+
+| **Origem** | **Para quê** |
+| --- | --- |
+| `security-group-crud-alunos` | a aplicação no ECS |
+| `138.255.108.180/32` (`Vitor-casa`) | o computador do usuário |
+| `rest-with-claude-app-sg` | sobra de uma tentativa anterior (ver Dúvidas abertas) |
+
+> ⚠️ **Segurança:** Nunca deixe a porta 3306 aberta para `0.0.0.0/0`. *Seu IP muda?* Edite a regra e escolha **My IP** de novo (descubra o IP em `https://checkip.amazonaws.com`).
+
+**Para o tutorial novo:** avisar que o campo *Source* só aceita o grupo se for escolhido na lista suspensa (ou colado como `sg-...`); avisar que o console pode já ter criado regras no `default` (IP do usuário); avisar que a 8080 aberta para o mundo expõe a API se ela não tiver autenticação.
+
+---
+
+## 7. Criar a Task Definition (ECS)
+
+> A Task Definition descreve como o contêiner roda: imagem, porta, CPU, memória e variáveis.
+
+### 7.1 Criar
+
+**Passo a passo executado** (a tela de criação é um formulário único, na mesma ordem do tutorial, mas **muitos campos vêm com valores padrão que precisam ser trocados**):
+
+1. Em **Elastic Container Service**, menu da esquerda: **Task definitions** → **Create new task definition**.
+2. **Task definition family:** vem preenchida com um nome aleatório (ex.: `subtle-app-91r9n8`). Troque pelo nome desejado (tutorial: `rest-with-claude-spring-taskdefinition`; o nosso: `crud-alunos-task-definition`).
+3. **Launch type:** **AWS Fargate**. *(A tela agora tem também **Managed Instances**.)* **OS/Architecture:** Linux/X86_64. **Network mode:** `awsvpc`.
+4. **CPU:** `1 vCPU`. **Memory:** `3 GB` (já vêm assim).
+5. **Task execution role:** escolher a role **existente** que recebeu a política de leitura do secret (5.2), e não "Create default role" nem "Create new role". **Task role:** pode ficar como está.
+6. Em **Container - 1**:
+    - **Name:** vem `Main`; troque (o nosso: `container-crudalunos`).
+    - **Image URI:** vem vazio; digite a URI do repositório com a tag, ex.: `<id-da-conta>.dkr.ecr.us-east-1.amazonaws.com/respositorio-crud-alunos:latest`. *(Há o botão **Browse ECR images**.)*
+    - **Container port:** vem `80`; troque para `8080`. **Protocol:** TCP. **Port name** e **App protocol (HTTP):** pode deixar.
+7. Em **Environment variables** (*Add individually*), **Add environment variable**:
+    - `DB_USER` | **Value** | `root`
+    - `TZ` | **Value** | `America/Sao_Paulo`
+    - `DB_PASSWORD` | **ValueFrom** | o **Secret ARN completo** do secret (com o sufixo aleatório no final)
+    - `DB_URL` | **Value** | `jdbc:mysql://<endpoint-do-banco>:3306/crud_alunos?createDatabaseIfNotExist=true` *(variável **a mais** que o tutorial não tem)*
+8. Em **Logging**, deixe **Use log collection** marcado, destino Amazon CloudWatch. Confira que `awslogs-group` ficou `/ecs/<nome-da-family>`, `awslogs-region` = `us-east-1`, `awslogs-stream-prefix` = `ecs` e `awslogs-create-group` = `true`.
+9. Clique em **Create**.
+
+> ⚠️ **`DB_PASSWORD` precisa ser `ValueFrom`.** Com o tipo `Value`, o ARN seria entregue à aplicação como se fosse a senha, e a conexão com o banco falharia.
+
+> 💡 A imagem não precisa existir no ECR para criar a Task Definition; ela só é necessária quando a tarefa subir (seção 8).
+
+> ⚠️ Se, mais tarde, a tarefa falhar com `AccessDenied` ao criar o log group, faltou a permissão `logs:CreateLogGroup` na role de execução: dê a permissão ou crie o log group à mão em **CloudWatch → Log groups**.
+
+**Para o tutorial novo:** dizer que o formulário traz valores aleatórios/padrão (family, nome do contêiner, porta 80); acrescentar a variável `DB_URL` (o tutorial supõe que o endereço do banco já está no código); avisar para escolher a role de execução existente; avisar do `ValueFrom`; avisar que o database pode ser criado pela aplicação (`createDatabaseIfNotExist=true`).
+
+### 7.2 Exportar o JSON (para a esteira)
+
+**Diferença do tutorial:** o tutorial diz que o `task-definition.json` "já existe no projeto". No nosso projeto **não existia**, então foi criado.
+
+**Passo a passo executado:**
+
+1. Abrir a Task Definition no ECS → revisão desejada → aba **JSON** (ou usar `aws ecs describe-task-definition`).
+2. Salvar o conteúdo como `task-definition.json` dentro do projeto (o nosso: `apicrud-alunos/task-definition.json`).
+3. Remover os campos que a AWS gera sozinha e que não podem ir ao registrar uma revisão: `taskDefinitionArn`, `revision`, `status`, `requiresAttributes`, `compatibilities`, `registeredAt` e `registeredBy`.
+4. Na `image`, acrescentar a tag `:latest` (a esteira troca a imagem a cada deploy).
+
+> ⚠️ O arquivo guarda valores da conta: ID da conta, ARN da role de execução, ARN do secret e o endereço do banco (`DB_URL`). Não há senha. Se recriar a role, o secret ou o contêiner, atualize o arquivo, senão a esteira registra uma Task Definition com valores antigos. Se o repositório for público, avalie se quer esses valores expostos.
+
+**Para o tutorial novo:** explicar como criar o arquivo quando ele ainda não existe e quais campos remover.
+
+---
+
+## Dúvidas abertas
+
+| **Dúvida** | **Onde** | **Como resolver** |
+| --- | --- | --- |
+| Valor final do **Estimated monthly costs** depois dos ajustes (meta: bem abaixo de 145,64 USD). | Seção 1 | Conferir no console e anotar aqui. |
+| A `ecsTaskExecutionRole` (role de execução da Task Definition) tem a política `LerSecretDB_CrudAlunos`? E a permissão `logs:CreateLogGroup`, já que `awslogs-create-group` é `true`? | Seção 7.1 | **IAM → Roles → `ecsTaskExecutionRole` → Permissions**. Se a tarefa falhar por `AccessDenied` ao criar o log group, criar `/ecs/crud-alunos-task-definition` à mão em CloudWatch. |
+| O console está sendo usado com o **usuário raiz** da conta (`registeredBy` = `...:root`). | Geral | Criar um usuário IAM administrador com MFA para o dia a dia; deixar o raiz só para emergências. |
+| Existe um grupo `rest-with-claude-app-sg` (nome do tutorial, de uma tentativa anterior) com regra na 3306 do banco. Manter ou apagar? | Seção 6.2 | Em **EC2 → Security Groups**, abra o grupo e veja em *Network interfaces* se algo o usa. Se nada usar, apague a regra da 3306 e depois o grupo. |
+| Qual origem foi usada na porta 8080 do `security-group-crud-alunos`: `0.0.0.0/0` ou **My IP**? | Seção 6.1 | Conferir em EC2 → Security Groups → Inbound rules e anotar. |
+| O repositório ficou com o nome `respositorio-crud-alunos` (falta um "i" em "repositorio"). Manter ou recriar? | Seção 2 | Recriar agora (o repositório está vazio) evita carregar o erro para a Task Definition, o `docker push` e o workflow. Atualizar a tabela de valores conforme a decisão. |
+
+## Problemas e diferenças encontradas
+
+| **Sintoma** | **Causa e Solução** |
+| --- | --- |
+| A tela de criação mostra "DB cluster identifier" e instâncias `db.r7g` | O engine **Aurora** está selecionado. Clique em **MySQL** e use **Full configuration**. |
+| Estimativa de ~145 USD/mês ao criar o RDS | Valores padrão: `db.m7g.large` e 200 GiB. Use `db.t4g.micro` (Burstable) e 20 GiB. |
+| Não acho "Initial database name" | Está na seção recolhida **Additional configuration**, no fim da página. |
+| Erro "CIDR block, a security group ID or a prefix list has to be specified" ao salvar a regra da 3306 | O campo *Source* recebeu só o texto do nome. Escolha o grupo **na lista suspensa** ou cole o ID `sg-...` dele. |
+| Não acho o campo "Endpoint" | Aba **Connectivity & security** → painel **Connect using** → **Endpoints**. |

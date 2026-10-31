@@ -65,6 +65,8 @@ Arquivo para retomar o contexto se a conversa for perdida. Ler junto com `PassoA
 
 ## Estado
 
+- **Ambiente AWS (2026-10-30, fim do dia):** esteira do GitHub Actions rodou e fez o deploy (Task Definition `:2`, aluno 6 incluído). O Service `service-crud-alunos` foi colocado em **Desired tasks = 0** (sem tarefas rodando). O **RDS `database-crud-alunos` foi parado pelo usuário no console (Stopped temporarily, 2026-10-30; a AWS o religa sozinha por volta de 2026-11-06 se não for usado)**, e o banco de sobra `vitrodr-db-server` (us-east-1d) foi apagado pelo usuário. Os perfis `default` e `crud-alunos` da AWS CLI são o mesmo usuário `GITHUB_ACTIONS_CRUD_ALUNOS`, sem permissão de RDS (só dá para ver ECS, ECR e EC2). O cluster ECS `rest-with-claude-spring` (sobra do tutorial original, com 1 Service e Container Insights enhanced) continua existindo com 0 tarefas. Para religar (seção 15.1 do tutorial): 1) RDS → Actions → Start e esperar Available; 2) ECS → Service → Update → Desired tasks = 1; 3) pegar o IP novo na aba Tasks. A esteira não altera o Desired tasks. O RDS parado religa sozinho após 7 dias.
+
 - Último commit: `69152c9` – Configurações iniciais (já enviado ao GitHub).
 - Sem commit: estrutura de camadas, pacote `exception`, os 7 endpoints (model, dto, mapper, service, controller), `pom.xml` com `spring-boot-starter-validation`, testes, `PassoAPasso.md`, `memoria.md`.
 - `.\mvnw test`: 52 testes passando.

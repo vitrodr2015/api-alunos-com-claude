@@ -1,0 +1,6 @@
+services:
+  app:
+    build: .
+    image: vitrodr/crud-alunos
+    ports:
+      - "8080:8080"

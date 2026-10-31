@@ -175,6 +175,8 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 | 6. Security groups | Grupo da aplicação (porta 8080) e regra 3306 no grupo `default` do RDS | `security-group-crud-alunos` |
 | 7.1 Task Definition | Contêiner, porta 8080, variáveis e logs | `crud-alunos-task-definition:1` |
 | 7.2 `task-definition.json` | Arquivo para a esteira, criado a partir do JSON da revisão `:1` | `apicrud-alunos/task-definition.json` |
+| 9. Service (ECS) | Service Fargate com 1 tarefa, grupo `security-group-crud-alunos`, IP público ligado e sem subnets de Local Zone | `service-crud-alunos` |
+| 8. Imagem no ECR | Imagem do `Dockerfile` enviada com a tag `latest`, usando o perfil `crud-alunos` da AWS CLI | `respositorio-crud-alunos:latest` (digest `sha256:49b1057e...`) |
 
 ### Decisões e por quê
 
@@ -197,9 +199,9 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 ### Falta fazer
 
 1. ~~`Dockerfile`~~ (feito, passo 12).
-2. Seção 8: enviar a imagem para o ECR (Docker e AWS CLI já instalados; falta `aws configure` com perfil próprio).
-3. Seção 9: criar o Service.
-4. Seção 10: testar a API pelo IP público (Postman).
+2. ~~Seção 8: enviar a imagem para o ECR~~ (feito).
+3. ~~Seção 9: criar o Service~~ (feito; a tarefa só subiu depois de dar à `ecsTaskExecutionRole` a permissão de ler o secret).
+4. ~~Seção 10: testar a API pelo IP público (Postman)~~ (feito; sem Swagger nem login, o teste é `GET /alunos`).
 5. Conexão com o MySQL na aplicação: JPA, driver, `application.yml` lendo `DB_URL`/`DB_USER`/`DB_PASSWORD`, `repository`.
 6. Seção 11: workflow do GitHub Actions (`.github/workflows`; resolver antes a pasta `.github/` ignorada) e cadastro dos secrets.
 7. Seções 12 a 15: rotina, problemas comuns, limpeza e ligar/desligar (custos).

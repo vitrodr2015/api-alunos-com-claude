@@ -41,6 +41,10 @@ class AlunoControllerTests {
 		mockMvc.perform(get("/alunos/5"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.nome").value("Eduarda Costa"));
+		mockMvc.perform(get("/alunos/6"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.nome").value("Felipe Rocha"))
+				.andExpect(jsonPath("$.email").value("felipe.rocha@escola.com"));
 		mockMvc.perform(get("/alunos").param("nome", "souza"))
 				.andExpect(jsonPath("$.content[0].id").value(1));
 	}

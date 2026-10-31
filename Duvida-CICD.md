@@ -25,6 +25,9 @@
 | **Contêiner** | `Container-vitrodr` | `container-crudalunos` |
 | **Log group** | `/ecs/rest-with-claude-spring-taskdefinition` | `/ecs/crud-alunos-task-definition` |
 | **Role de execução da task** | `ECS-role-bd3e720b` ou `ecsTaskExecutionRole` | `ecsTaskExecutionRole` |
+| **Service (ECS)** | `rest-with-claude-spring-taskdefinition-service` | `service-crud-alunos` |
+| **Perfil da AWS CLI** | (não usa; `aws configure` direto) | `crud-alunos` |
+| **Imagem local** | `rest-with-claude` | `crud-alunos-local` |
 | **Classe da instância** | `db.t4g.micro` | `db.t4g.micro` |
 
 ## Andamento
@@ -40,7 +43,10 @@
 | 6.1 Criar o security group da aplicação | ✅ Feita (`security-group-crud-alunos`) |
 | 6.2 Liberar a aplicação no banco | ✅ Feita (regra 3306 salva no grupo `default`) |
 | 7.1 Criar a Task Definition | ✅ Feita e conferida pelo JSON (`crud-alunos-task-definition:1`) |
-| 7.2 Exportar o JSON para a esteira | ✅ Feita (`apicrud-alunos/task-definition.json`, ainda sem commit) |
+| 7.2 Exportar o JSON para a esteira | ✅ Feita (`apicrud-alunos/task-definition.json`) |
+| 8. Enviar a primeira imagem para o ECR | ✅ Feita (imagem `latest` enviada para `respositorio-crud-alunos`) |
+| 9. Criar o Service (ECS) | ✅ Feita (`service-crud-alunos`, tarefa **Running** após corrigir a permissão do secret) |
+| 10. Testar a aplicação | ✅ Feita (API respondendo pelo IP público, testada no Postman) |
 
 ---
 
@@ -295,12 +301,99 @@ Ao final, a porta 3306 do grupo `default` ficou com estas origens:
 
 ---
 
+## 8. Enviar a primeira imagem para o ECR
+
+> O ECS precisa de uma imagem para iniciar. Você pode enviar a primeira manualmente ou deixar a esteira (seção 11) fazer isso.
+
+**Passo a passo executado** (validado; `Login Succeeded` e o push terminou com `latest: digest: sha256:...`):
+
+1. Confirme a AWS CLI: `aws --version`. *(Já estava instalada, versão 2.38.4. Atenção: é `--version`; `--verison` dá o erro "required: command".)*
+2. Crie um **perfil próprio** com a chave do usuário da esteira (o tutorial manda rodar `aws configure` sem perfil):
+    ```bash
+    aws configure --profile crud-alunos
+    ```
+    Campos, nesta ordem: **AWS Access Key ID** (o código `AKIA...`), **AWS Secret Access Key** (a chave longa de 40 caracteres), região `us-east-1` e formato `json`. Confirme com `aws configure list-profiles`.
+3. Gere a imagem, **na pasta do projeto** (onde está o `Dockerfile`):
+    ```bash
+    docker build -t crud-alunos-local .
+    ```
+    *(Já feito antes, ao testar o `Dockerfile` localmente.)*
+4. Faça o login no ECR e **espere a resposta `Login Succeeded`** antes do próximo comando:
+    ```bash
+    aws ecr get-login-password --region us-east-1 --profile crud-alunos | docker login --username AWS --password-stdin <id-da-conta>.dkr.ecr.us-east-1.amazonaws.com
+    ```
+5. Marque e envie a imagem com o nome do repositório do ECR:
+    ```bash
+    docker tag crud-alunos-local:latest <id-da-conta>.dkr.ecr.us-east-1.amazonaws.com/respositorio-crud-alunos:latest
+    docker push <id-da-conta>.dkr.ecr.us-east-1.amazonaws.com/respositorio-crud-alunos:latest
+    ```
+6. No console do **ECR**, abra o repositório e confirme que a imagem `latest` aparece na lista. *(Confirmado: a lista mostra **3 itens** para um único envio: o **Image Index** com a tag `latest`, a **Image** Linux x86_64 e um item **Other** de 0 MB, que é o atestado de proveniência que o Docker mais novo acrescenta. É normal. O tamanho aparece comprimido: ~139 MB no ECR contra 521 MB da imagem local.)*
+
+> ⚠️ **Rode os comandos um de cada vez.** Colados juntos, o `docker push` roda mesmo que o login tenha falhado e usa uma sessão antiga já expirada.
+
+> 🔒 No `aws configure`, o **nome do usuário** (`GITHUB_ACTIONS_CRUD_ALUNOS`) **não é digitado**: o que identifica o usuário é a Access Key ID. A Secret Access Key só aparece na criação da chave; se for perdida, crie um par novo e apague o antigo.
+
+**Para o tutorial novo:** avisar que o ECR passa a listar 3 itens por envio (índice, imagem e atestado), sem problema; explicar o `--profile` e a ordem dos campos do `aws configure`; avisar para não colar todos os comandos de uma vez; avisar que o `docker build` pode ser pulado se a imagem já foi gerada; mostrar a mensagem de sucesso esperada.
+
+---
+
+## 9. Criar o Service (ECS)
+
+> O Service mantém a aplicação rodando e a reinicia se cair.
+
+**Passo a passo executado** (validado; a tarefa chegou a **Running**):
+
+1. Em **Elastic Container Service** → **Clusters** → clique no cluster → aba **Services** → **Create**.
+2. **Task definition family:** a da Task Definition (o nosso: `crud-alunos-task-definition`); **Revision:** em branco ou a mais recente.
+3. **Service name:** o nome do Service (tutorial: `rest-with-claude-spring-taskdefinition-service`; o nosso: `service-crud-alunos`). *(Vem vazio; anote o nome, ele é fixo no workflow.)*
+4. **Compute options:** **Capacity provider strategy** → **Use custom (Advanced)** → `FARGATE`, Base `0`, Weight `1`. *(O cluster não tem estratégia padrão configurada.)*
+5. **Desired tasks:** `1`. Deixe o restante de **Deployment configuration** como está.
+6. Abra **Networking** *(vem recolhido e é onde estão os campos principais)*:
+    - **VPC:** a default.
+    - **Subnets:** a lista traz as 8 subnets da VPC, **incluindo duas de Local Zone** (`us-east-1-atl-2a` e `us-east-1-atl-2b`). **Remova as duas** e deixe só as zonas `us-east-1a` a `us-east-1f`. O Fargate não funciona em Local Zone.
+    - **Security group:** **Use an existing security group**. *(Vem preenchido com o `default`, que é o grupo do banco.)* Remova o `default` e deixe só o grupo da aplicação (o nosso: `security-group-crud-alunos`).
+    - **Public IP:** **Turned on**.
+7. Deixe as seções opcionais como estão (Service Connect, Service discovery, Gateway, Load balancing, VPC Lattice, Auto scaling, Volume, Troubleshooting). *(Gateway e VPC Lattice são novas; VPC Lattice tem custo.)*
+8. Clique em **Create**. O Service fica **Active** com "0/1 Tasks running" por alguns minutos.
+9. Acompanhe em **Cluster → aba Tasks**, com o filtro em **Any desired status**: o **Last status** deve virar **Running**. O **Public IP** aparece na linha da tarefa (e muda a cada nova tarefa).
+
+> 🔴 **Erro encontrado na primeira tentativa:** as tarefas pararam em sequência com
+> `ResourceInitializationError: ... AccessDeniedException: ... ecsTaskExecutionRole ... is not authorized to perform: secretsmanager:GetSecretValue ... because no identity-based policy allows the secretsmanager:GetSecretValue action`.
+> **Causa:** a política de leitura do secret (seção 5.2) tinha sido criada em **outra role**, e não na `ecsTaskExecutionRole`, que é a role de execução usada pela Task Definition.
+> **Solução:** em **IAM → Roles → `ecsTaskExecutionRole` → Permissions → Add permissions → Create inline policy**, colar a política com `secretsmanager:GetSecretValue` para o secret (ver 5.2), e depois, em **ECS → Services → Update**, marcar **Force new deployment**. A tarefa nova subiu em cerca de 2 minutos.
+
+> 💰 Com 1 tarefa de 1 vCPU e 3 GB ligada, o custo é de cerca de US$ 1,30 por dia. Para pausar, coloque **Desired tasks = 0** (seção 15). O RDS também cobra enquanto está ligado.
+
+**Para o tutorial novo:** avisar que o formulário traz o `default` pré-selecionado e as duas Local Zones na lista de subnets; explicar que a política da seção 5.2 tem de ir na role que a Task Definition usa como *Task execution role* (conferir o nome em Task definition → JSON → `executionRoleArn`); mostrar como ler o **Stopped reason** na aba Tasks.
+
+---
+
+## 10. Testar a aplicação
+
+**Passo a passo executado** (validado no Postman):
+
+1. No cluster, aba **Tasks**, ache a tarefa com **Last status = Running** e copie o **Public IP** (coluna da tabela, ou dentro do ID da tarefa → **Configuration**). *(O IP muda a cada tarefa nova.)*
+2. No Postman (ou no navegador), chame `http://<IP-público>:8080/alunos`. A resposta é a lista dos alunos.
+3. No Postman, guarde o endereço numa variável (`base_url`; no nosso ambiente é a `baseUrl`) e troque só o valor quando o IP mudar. Cuidado para não deixar barra dupla (`//alunos`).
+
+**Diferenças do tutorial** (o tutorial foi escrito para outro projeto):
+
+- O tutorial manda abrir `/swagger-ui/index.html`. **O nosso projeto não tem Swagger**; o teste é direto em `/alunos`.
+- O tutorial espera **401** em `/` e manda fazer login em `/auth/signin` com um `accessToken`. **O nosso projeto não tem autenticação ainda**, então as chamadas funcionam sem token. Em `/`, a nossa API devolve 404 (não existe rota nessa raiz).
+- O tutorial testa `/person`; o nosso recurso é `/alunos`.
+
+> 🔒 Sem autenticação, quem souber o IP e a porta 8080 liberada consegue criar e apagar alunos. Para estudo, deixe a porta 8080 do security group aberta só para **My IP** (se estiver em `0.0.0.0/0`, restrinja).
+
+**Para o tutorial novo:** deixar claro que o teste depende de a aplicação ter Swagger e login; indicar uma alternativa para projetos sem eles (chamar um endpoint simples como `GET /alunos`).
+
+---
+
 ## Dúvidas abertas
 
 | **Dúvida** | **Onde** | **Como resolver** |
 | --- | --- | --- |
 | Valor final do **Estimated monthly costs** depois dos ajustes (meta: bem abaixo de 145,64 USD). | Seção 1 | Conferir no console e anotar aqui. |
-| A `ecsTaskExecutionRole` (role de execução da Task Definition) tem a política `LerSecretDB_CrudAlunos`? E a permissão `logs:CreateLogGroup`, já que `awslogs-create-group` é `true`? | Seção 7.1 | **IAM → Roles → `ecsTaskExecutionRole` → Permissions**. Se a tarefa falhar por `AccessDenied` ao criar o log group, criar `/ecs/crud-alunos-task-definition` à mão em CloudWatch. |
+| A política de leitura do secret criada na seção 5.2 ficou em **outra role** (não na `ecsTaskExecutionRole`). Qual role é essa? Apagar a sobra? | Seção 5.2 | **IAM → Roles**, abrir as roles de ECS e procurar a `LerSecretDB_CrudAlunos`. Apagar a sobra, deixando a da `ecsTaskExecutionRole`. |
 | O console está sendo usado com o **usuário raiz** da conta (`registeredBy` = `...:root`). | Geral | Criar um usuário IAM administrador com MFA para o dia a dia; deixar o raiz só para emergências. |
 | Existe um grupo `rest-with-claude-app-sg` (nome do tutorial, de uma tentativa anterior) com regra na 3306 do banco. Manter ou apagar? | Seção 6.2 | Em **EC2 → Security Groups**, abra o grupo e veja em *Network interfaces* se algo o usa. Se nada usar, apague a regra da 3306 e depois o grupo. |
 | Qual origem foi usada na porta 8080 do `security-group-crud-alunos`: `0.0.0.0/0` ou **My IP**? | Seção 6.1 | Conferir em EC2 → Security Groups → Inbound rules e anotar. |
@@ -314,4 +407,11 @@ Ao final, a porta 3306 do grupo `default` ficou com estas origens:
 | Estimativa de ~145 USD/mês ao criar o RDS | Valores padrão: `db.m7g.large` e 200 GiB. Use `db.t4g.micro` (Burstable) e 20 GiB. |
 | Não acho "Initial database name" | Está na seção recolhida **Additional configuration**, no fim da página. |
 | Erro "CIDR block, a security group ID or a prefix list has to be specified" ao salvar a regra da 3306 | O campo *Source* recebeu só o texto do nome. Escolha o grupo **na lista suspensa** ou cole o ID `sg-...` dele. |
+| Tarefa do Service para com `ResourceInitializationError ... AccessDeniedException ... secretsmanager:GetSecretValue` | A `ecsTaskExecutionRole` não tem a política de leitura do secret. Crie a política inline nela (IAM → Roles) e force um novo deploy do Service. |
+| Service fica `0/1 Tasks running` | Abra a aba **Tasks** (filtro *Any desired status*) e leia o **Stopped reason** da tarefa; ele indica a causa. |
+| `aws: [ERROR]: The config profile (crud-alunos) could not be found` | O perfil ainda não foi criado. Rode `aws configure --profile crud-alunos`. |
+| `password is empty` no `docker login` | O comando `aws ecr get-login-password` falhou (perfil inexistente ou credenciais erradas) e não passou senha. Corrija o perfil e rode o login de novo. |
+| `error from registry: Your authorization token has expired` no `docker push` | O login no ECR falhou ou expirou (vale 12 horas). Refaça o login e confirme `Login Succeeded` antes do push. |
+| Login falha mesmo com o perfil criado | Confira se a Access Key ID e a Secret Access Key não foram digitadas **trocadas** ou com o **nome do usuário** no lugar da chave. Refaça `aws configure --profile crud-alunos`. |
+| `aws: [ERROR]: ... required: command` ao rodar `aws --verison` | Erro de digitação: o certo é `aws --version`. |
 | Não acho o campo "Endpoint" | Aba **Connectivity & security** → painel **Connect using** → **Endpoints**. |

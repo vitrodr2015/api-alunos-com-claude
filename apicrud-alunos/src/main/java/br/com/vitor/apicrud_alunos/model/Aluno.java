@@ -2,12 +2,32 @@ package br.com.vitor.apicrud_alunos.model;
 
 import java.time.LocalDate;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+// Nomes e tamanhos das colunas precisam bater com db/migration/V1__create_table_aluno.sql
+@Entity
+@Table(name = "aluno")
 public class Aluno {
 
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
+
+	@Column(name = "nome", nullable = false, length = 100)
 	private String nome;
+
+	@Column(name = "email", nullable = false, length = 255)
 	private String email;
+
+	@Column(name = "data_nascimento", nullable = false)
 	private LocalDate dataNascimento;
+
+	@Column(name = "ativo", nullable = false)
 	private boolean ativo = true;
 
 	public Long getId() {

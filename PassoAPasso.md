@@ -354,6 +354,18 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - Regras: nunca editar uma migration já aplicada (criar uma nova); banco que já existia sem Flyway precisa de `baseline-on-migrate`; evitar `ddl-auto: update`.
 - **Deploy:** ao subir na AWS, o Flyway vai criar a tabela `aluno` no database `crud_alunos` do RDS na primeira vez. Isso exige o RDS `Available` e o usuário `root` com permissão de criar tabela (tem).
 
+## 22. Entidade e repository
+
+- **Status:** concluído (branch `feature/entidade-repository`)
+- `model/Aluno` virou entidade JPA: `@Entity`, `@Table(name = "aluno")`, `@Id` + `@GeneratedValue(strategy = IDENTITY)` e `@Column` em cada campo, com nomes e tamanhos iguais aos da migration `V1__create_table_aluno.sql` (`nome` 100, `email` 255, `data_nascimento`, `ativo`). Em Spring Boot 4 / Jakarta, as anotações vêm de `jakarta.persistence`.
+- `repository/AlunoRepository extends JpaRepository<Aluno, Long>`. Sem consultas próprias por enquanto; elas entram quando o `AlunoService` passar a usar o banco.
+- O `AlunoService` **continua usando a lista em memória**: este passo só cria a entidade e o repository. A troca fica para o passo seguinte, junto com a migration `V2__...` dos 8 alunos fixos.
+- Verificado (2026-11-01):
+  - `mvnw test`: 52 testes passando (H2, com `ddl-auto: create-drop`);
+  - aplicação no MySQL local com `ddl-auto: validate`: sobe em cerca de 4 s, sem reclamar de coluna ou tipo (o "Pronto quando");
+  - prova de que o `validate` confere de verdade: troquei temporariamente o nome da coluna `data_nascimento` na entidade e a aplicação **não subiu**, com `Schema validation: missing column [data_nasc_errada] in table [aluno]`. A alteração foi desfeita. Até este passo o `validate` não tinha nenhuma entidade para conferir, então "subir sem erro" ainda não provava nada.
+- Os testes com H2 não validam a migration do MySQL (o H2 cria o schema a partir da entidade, e o Flyway está desligado neles); a conferência contra o MySQL real é a subida acima. Um teste automático de repositório entra no Passo 24 do playbook.
+
 ## Próximos passos
 
 - Conectar a aplicação ao MySQL (passo 5 da lista "Falta fazer" do passo 11).

@@ -43,6 +43,7 @@ public class AlunoService {
 		semear("Diego Martins", "diego.martins@escola.com", LocalDate.of(1998, 7, 15));
 		semear("Eduarda Costa", "eduarda.costa@escola.com", LocalDate.of(2002, 1, 30));
 		semear("Felipe Rocha", "felipe.rocha@escola.com", LocalDate.of(1997, 9, 8));
+		semear("Gustavo Alves", "gustavo.alves@escola.com", LocalDate.of(2003, 4, 17));
 	}
 
 	public synchronized Aluno criar(Aluno novo) {

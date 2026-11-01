@@ -251,6 +251,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - Limitação: em repositório **privado** de conta gratuita o GitHub não aplica rulesets (aviso na própria tela). O aviso deixou de aparecer depois da criação; confirmar a visibilidade do repositório.
 - Teste de bloqueio: branch `teste-ci-quebrado` com um teste quebrado de propósito (nunca mesclar). O PR deve ficar com o `build` vermelho e o Merge bloqueado. **Resultado ainda não confirmado.**
 - Daqui em diante, mudanças vão por branch e pull request; o merge gera o push na `main` que dispara o deploy.
+- **Ponto de atenção (repositório público):** o repositório é público. Foram encontrados no histórico o ID da conta AWS, o endpoint do RDS, ARNs, IDs de security group e o IP de casa; não há senha nem chave de acesso. Os `.md` atuais foram limpos (IP de casa e IDs de security group viraram marcadores), mas o histórico do Git mantém os valores antigos. Decisão: não reescrever o histórico (projeto de estudo). Cuidados daqui para frente: nunca versionar senha, chave ou token; usar marcadores para IPs e IDs nos `.md`; manter a senha do RDS forte; desligar o *Public access* do RDS quando não precisar do acesso pelo computador local.
 
 ## Próximos passos
 

@@ -6,6 +6,8 @@
 
 > 💡 *Como usar:* a cada seção do tutorial que for executada, acrescente aqui a seção com o mesmo número e título, com o passo a passo como está no console hoje. Dúvidas sem resposta vão em **Dúvidas abertas**.
 
+> 🔓 **Ponto de atenção: repositório público.** Este repositório é público (projeto de estudo). Antes de colar qualquer valor aqui, troque por um marcador: seu IP de casa por `<seu-IP>/32`, IDs de security group por `sg-...`, o IP da tarefa por `<IP-publico>`. **Nunca** coloque senha, Access Key, Secret Access Key ou token. O ID da conta AWS, os ARNs e o endpoint do RDS não são credenciais, mas ficam visíveis no `task-definition.json` (a esteira precisa deles) e no histórico do Git, que não some ao editar os arquivos. Por isso a senha do RDS tem de ser forte, e o **Public access** do RDS só deve ficar ligado enquanto for preciso usar o computador local.
+
 ---
 
 ## Valores usados (nossos, diferentes do tutorial)
@@ -233,7 +235,7 @@
 
 **Passo a passo executado** (validado):
 
-1. Em **Security Groups**, ache o grupo **default** que o RDS usa (confira o ID: o do nosso banco é o `sg-0511fa5538e05f367`, porque pode haver mais de um grupo chamado `default`) e clique nele.
+1. Em **Security Groups**, ache o grupo **default** que o RDS usa (confira o ID: o do nosso banco é o `sg-...`, porque pode haver mais de um grupo chamado `default`) e clique nele.
 2. Aba **Inbound rules** → **Edit inbound rules** → **Add rule**:
     - **Type:** MYSQL/Aurora (porta `3306`)
     - **Source:** **Custom**, depois **clique no grupo da aplicação na lista suspensa** (ou cole o ID `sg-...` dele). *(Só digitar o nome não funciona: o console mostra o erro "CIDR block, a security group ID or a prefix list has to be specified".)*
@@ -247,7 +249,7 @@ Ao final, a porta 3306 do grupo `default` ficou com estas origens:
 | **Origem** | **Para quê** |
 | --- | --- |
 | `security-group-crud-alunos` | a aplicação no ECS |
-| `138.255.108.180/32` (`Vitor-casa`) | o computador do usuário |
+| `<seu-IP>/32` (`Vitor-casa`) | o computador do usuário |
 | `rest-with-claude-app-sg` | sobra de uma tentativa anterior (ver Dúvidas abertas) |
 
 > ⚠️ **Segurança:** Nunca deixe a porta 3306 aberta para `0.0.0.0/0`. *Seu IP muda?* Edite a regra e escolha **My IP** de novo (descubra o IP em `https://checkip.amazonaws.com`).

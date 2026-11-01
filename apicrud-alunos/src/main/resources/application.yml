@@ -1,3 +1,10 @@
 spring:
   application:
     name: apicrud-alunos
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # Padrão seguro: o MySQL local do Docker (porta 3307). Na nuvem, DB_URL vem da Task Definition.
+    url: ${DB_URL:jdbc:mysql://localhost:3307/crud_alunos?createDatabaseIfNotExist=true}
+    username: ${DB_USER:root}
+    # Segredo sem valor padrão: sem DB_PASSWORD a aplicação não sobe
+    password: ${DB_PASSWORD}

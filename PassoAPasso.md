@@ -126,7 +126,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 
 - **Status:** concluído, ainda sem commit
 - `AlunoService` passou a guardar os alunos numa `CopyOnWriteArrayList` (antes era um mapa em memória).
-- A aplicação sobe com alunos fixos. Começou com 5 (ids 1 a 5): Ana Souza, Bruno Lima, Carla Dias, Diego Martins e Eduarda Costa. Depois entraram o id 6 (Felipe Rocha, junto com a esteira) e o id 7 (Gustavo Alves, `gustavo.alves@escola.com`, commit `d539331`). Os próximos criados começam no id 8. O teste `AlunoControllerTests` confere os registros fixos, inclusive o 7.
+- A aplicação sobe com alunos fixos. Começou com 5 (ids 1 a 5): Ana Souza, Bruno Lima, Carla Dias, Diego Martins e Eduarda Costa. Depois entraram o id 6 (Felipe Rocha, junto com a esteira) e o id 7 (Gustavo Alves, `gustavo.alves@escola.com`, commit `d539331`) e o id 8 (Helena Barros, `helena.barros@escola.com`, primeira mudança do ciclo do Git Flow, branch `feature/aluno-8`). Os próximos criados começam no id 9. O teste `AlunoControllerTests` confere os registros fixos, inclusive o 7.
   - Na coleção do Postman, os 5 primeiros itens da carga inicial passam a responder 409 (e-mail já existe); os 5 últimos criam normalmente.
 - `AlunoControllerTests` agora usa `@SpringBootTest` + `@AutoConfigureMockMvc` (antes `@WebMvcTest`), com a aplicação inteira. Cobre busca, listagem, criação, atualização, remoção, 404 e 400, mais os registros fixos. 24 testes no total; a suíte inteira tem 36, todos passando.
 

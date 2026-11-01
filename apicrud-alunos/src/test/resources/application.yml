@@ -1,6 +1,9 @@
 spring:
   application:
     name: apicrud-alunos
+  # Os testes usam H2 e as migrations são específicas do MySQL
+  flyway:
+    enabled: false
   jpa:
     hibernate:
       ddl-auto: create-drop

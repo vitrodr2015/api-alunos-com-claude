@@ -336,6 +336,24 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - Os testes têm o próprio `src/test/resources/application.yml`, que **substitui** o de `main`, não soma. Prova no projeto: o `application.yml` principal tem datasource MySQL e a senha sem padrão, e os testes sobem normalmente com H2, o que não aconteceria se os dois fossem somados. Quando entrar a segurança (JWT), o arquivo de teste precisa declarar tudo o que os testes exigirem.
 - A senha do banco não vai em nenhum desses arquivos: continua na variável `DB_PASSWORD`.
 
+## 21. Migrations com Flyway
+
+- **Status:** concluído (branch `feature/flyway`)
+- **Diferença do playbook:** ele manda `flyway-core` + `flyway-mysql`. No Spring Boot 4 a autoconfiguração do Flyway vem no starter próprio, então o `pom.xml` leva `spring-boot-starter-flyway` (traz o `flyway-core`) e `org.flywaydb:flyway-mysql`; as versões são gerenciadas pelo Boot.
+- `src/main/resources/application.yml`: `spring.flyway.enabled: true`, `locations: classpath:db/migration`, `spring.jpa.hibernate.ddl-auto: validate` (o Hibernate só confere o banco, nunca o altera) e `open-in-view: false` (o log avisava que vinha ligado por padrão).
+- `src/test/resources/application.yml`: `spring.flyway.enabled: false`. Os testes usam H2 e a migration é específica do MySQL.
+- Migration `src/main/resources/db/migration/V1__create_table_aluno.sql`: tabela `aluno` com `id` (BIGINT, auto incremento), `nome` (VARCHAR 100), `email` (VARCHAR 255, único), `data_nascimento` (DATE) e `ativo` (BOOLEAN, padrão verdadeiro), em InnoDB `utf8mb4`/`utf8mb4_unicode_ci`. A collation não diferencia maiúsculas de minúsculas, o que dá a unicidade de e-mail sem caixa que o contrato (passo 5) pede.
+- Verificado no `mysql-dev` (banco vazio, 2026-11-01):
+  - 1ª subida: Flyway criou `flyway_schema_history` e aplicou a versão 1 (`create table aluno`); a aplicação subiu em cerca de 4 s;
+  - 2ª subida: `Successfully validated 1 migration` e `Schema is up to date. No migration necessary`;
+  - `GET /alunos/8` responde normalmente (o `Aluno` ainda está em memória);
+  - `mvnw test`: 52 testes passando, com o Flyway desligado.
+- O aviso "MySQL 8.4 is newer than this version of Flyway" **não apareceu**. Durante o build, o Maven mostra avisos `HTTP Status: 401` de repositórios que o `flyway-mysql` declara; são só ruído, o build não falha.
+- Falhas de teste durante a verificação: uma subida falhou com `Port 8080 was already in use`, porque a instância anterior ainda estava no ar. Foi colisão do teste, não da aplicação.
+- Ainda **sem seed**: os 8 alunos fixos continuam na lista em memória do `AlunoService`. Quando o service passar a usar o banco, eles entram em uma migration nova (`V2__...`), nunca editando a `V1`.
+- Regras: nunca editar uma migration já aplicada (criar uma nova); banco que já existia sem Flyway precisa de `baseline-on-migrate`; evitar `ddl-auto: update`.
+- **Deploy:** ao subir na AWS, o Flyway vai criar a tabela `aluno` no database `crud_alunos` do RDS na primeira vez. Isso exige o RDS `Available` e o usuário `root` com permissão de criar tabela (tem).
+
 ## Próximos passos
 
 - Conectar a aplicação ao MySQL (passo 5 da lista "Falta fazer" do passo 11).

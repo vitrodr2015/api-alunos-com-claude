@@ -8,3 +8,11 @@ spring:
     username: ${DB_USER:root}
     # Segredo sem valor padrão: sem DB_PASSWORD a aplicação não sobe
     password: ${DB_PASSWORD}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jpa:
+    open-in-view: false
+    hibernate:
+      # validate: o Hibernate só confere o banco criado pelo Flyway, nunca o altera
+      ddl-auto: validate

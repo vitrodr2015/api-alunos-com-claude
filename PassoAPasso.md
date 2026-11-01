@@ -326,6 +326,16 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - Rodar pela IDE ou pelo terminal agora exige a variável: no IntelliJ, Run → Edit Configurations → Environment variables (`DB_PASSWORD=...`); no terminal, `export DB_PASSWORD=...` antes de `./mvnw spring-boot:run`.
 - **Cuidado com o deploy:** a aplicação passa a **exigir o banco no arranque**. Na AWS, o RDS precisa estar `Available` antes do Service subir, senão a tarefa cai ao iniciar. A Task Definition já tem `DB_URL`, `DB_USER` e `DB_PASSWORD` (esta última via Secrets Manager), com os mesmos nomes. O `Aluno` continua em memória: o banco só é conectado, ainda sem tabelas nem `repository`.
 
+## 20. Perfis e arquivos locais
+
+- **Status:** concluído (branch `feature/perfis-locais`)
+- O `.gitignore` da raiz já ignorava `application-local.yml`, `application-secret*.yml`, `.env` e `.env.*`; conferido com `git check-ignore`. Nada novo foi preciso nele.
+- Configuração só desta máquina vai em `apicrud-alunos/src/main/resources/application-local.yml` (ignorado). Só vale com o perfil ativo: `SPRING_PROFILES_ACTIVE=local` (na IDE, em Environment variables; no terminal, `export SPRING_PROFILES_ACTIVE=local`).
+- Teste feito com um `application-local.yml` temporário (`server.port: 8081`): sem o perfil a aplicação subiu na 8080 e ignorou o arquivo; com `SPRING_PROFILES_ACTIVE=local` subiu na 8081. O arquivo temporário foi removido e nunca apareceu no `git status`.
+- Criado o modelo `apicrud-alunos/application-local.yml.example` (versionado, só com exemplos comentados e sem segredos). Fica fora de `src/main/resources` para não ser empacotado no JAR. O nome `.example` não casa com a regra de ignore.
+- Os testes têm o próprio `src/test/resources/application.yml`, que **substitui** o de `main`, não soma. Prova no projeto: o `application.yml` principal tem datasource MySQL e a senha sem padrão, e os testes sobem normalmente com H2, o que não aconteceria se os dois fossem somados. Quando entrar a segurança (JWT), o arquivo de teste precisa declarar tudo o que os testes exigirem.
+- A senha do banco não vai em nenhum desses arquivos: continua na variável `DB_PASSWORD`.
+
 ## Próximos passos
 
 - Conectar a aplicação ao MySQL (passo 5 da lista "Falta fazer" do passo 11).

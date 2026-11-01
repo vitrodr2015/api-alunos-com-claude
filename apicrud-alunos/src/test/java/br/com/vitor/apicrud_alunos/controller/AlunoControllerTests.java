@@ -34,7 +34,7 @@ class AlunoControllerTests {
 	void registrosFixosExistemAoSubirAAplicacao() throws Exception {
 		mockMvc.perform(get("/alunos/1"))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.nome").value("Ana Souza"))
+				.andExpect(jsonPath("$.nome").value("TESTE QUEBRADO DE PROPOSITO"))
 				.andExpect(jsonPath("$.email").value("ana.souza@escola.com"))
 				.andExpect(jsonPath("$.dataNascimento").value("2000-05-10"))
 				.andExpect(jsonPath("$.ativo").value(true));

@@ -255,7 +255,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 
 ## 16. Fluxo Git Flow
 
-- **Status:** em andamento (branches e regras criadas; falta praticar o ciclo completo)
+- **Status:** concluído; ciclo completo praticado em 2026-11-01 (release `1.0.0`)
 - Motivo: o usuário quis juntar vários PRs numa versão e só então acionar a esteira, e escolheu estudar o Git Flow.
 - Branches:
 
@@ -271,7 +271,15 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - `develop` criada a partir da `main` (commit `22480ce`).
 - Workflow: PRs para `main`, `develop` e `release/**` rodam build e testes; o deploy continua só em `push` na `main` (primeira feature: `feature/ci-gitflow`). O `push` em `develop` não foi incluído de propósito: os passos de deploy usam `if: github.event_name == 'push'` e publicariam a cada merge na `develop`.
 - `gh` (GitHub CLI) instalado com `winget` e logado; passou a abrir PRs e a acompanhar o `build` pelo terminal.
-- Ciclo completo (a praticar): `feature/x` → PR para `develop` → `release/1.0.0` a partir da `develop` → PR para `main` com merge commit → tag `v1.0.0` → PR da `main` de volta para a `develop`.
+- Ciclo completo, como foi feito:
+  1. `feature/ci-gitflow` → PR #3 → `develop`.
+  2. `feature/aluno-8` → PR #4 → `develop`.
+  3. `release/1.0.0` criada a partir da `develop`.
+  4. PR #5 `release/1.0.0` → `main`, com merge commit (`7e10a2f`). O merge disparou a esteira, que fez o deploy (`success`); a tarefa foi trocada e o IP mudou.
+  5. Tag anotada `v1.0.0` no commit `7e10a2f`.
+  6. PR #6 `main` → `develop`, para a `develop` receber o merge commit da release.
+- A `release/1.0.0` foi usada como acumulador (ideia do usuário): o PR #5 ficou aberto enquanto mais PRs podiam entrar na release, e o deploy só aconteceu no merge. No Git Flow clássico a release só recebe correções e as features novas esperam a próxima; fica como segundo exercício.
+- Pendente: apagar no GitHub as branches já mescladas (`release/1.0.0`, `feature/ci-gitflow`, `feature/aluno-8`, `ci-permissions`, `teste-ci-quebrado`). O sistema bloqueou `git push origin --delete`, então é pelo botão **Delete branch**.
 
 ## Próximos passos
 

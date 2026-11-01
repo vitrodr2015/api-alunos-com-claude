@@ -6,8 +6,9 @@ on:
     # Mudanças só em documentação não disparam build nem deploy
     paths-ignore:
       - '**.md'
+  # Git Flow: PRs para main, develop e release/* rodam build e testes (sem deploy)
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "develop", "release/**" ]
 
 # A esteira só lê o repositório (menor privilégio)
 permissions:

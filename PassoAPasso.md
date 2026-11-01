@@ -126,7 +126,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 
 - **Status:** concluído, ainda sem commit
 - `AlunoService` passou a guardar os alunos numa `CopyOnWriteArrayList` (antes era um mapa em memória).
-- A aplicação sobe com alunos fixos. Começou com 5 (ids 1 a 5): Ana Souza, Bruno Lima, Carla Dias, Diego Martins e Eduarda Costa. Depois entraram o id 6 (Felipe Rocha, junto com a esteira) e o id 7 (Gustavo Alves, `gustavo.alves@escola.com`, commit `d539331`). Os próximos criados começam no id 8. O teste `AlunoControllerTests` confere os registros fixos, inclusive o 7.
+- A aplicação sobe com alunos fixos. Começou com 5 (ids 1 a 5): Ana Souza, Bruno Lima, Carla Dias, Diego Martins e Eduarda Costa. Depois entraram o id 6 (Felipe Rocha, junto com a esteira) e o id 7 (Gustavo Alves, `gustavo.alves@escola.com`, commit `d539331`) e o id 8 (Helena Barros, `helena.barros@escola.com`, primeira mudança do ciclo do Git Flow, branch `feature/aluno-8`). Os próximos criados começam no id 9. O teste `AlunoControllerTests` confere os registros fixos, inclusive o 7.
   - Na coleção do Postman, os 5 primeiros itens da carga inicial passam a responder 409 (e-mail já existe); os 5 últimos criam normalmente.
 - `AlunoControllerTests` agora usa `@SpringBootTest` + `@AutoConfigureMockMvc` (antes `@WebMvcTest`), com a aplicação inteira. Cobre busca, listagem, criação, atualização, remoção, 404 e 400, mais os registros fixos. 24 testes no total; a suíte inteira tem 36, todos passando.
 
@@ -252,6 +252,26 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - Teste de bloqueio: branch `teste-ci-quebrado` com um teste quebrado de propósito (nunca mesclar). O PR deve ficar com o `build` vermelho e o Merge bloqueado. **Resultado confirmado em 2026-11-01:** o PR ficou com o `build` vermelho, o Merge ficou bloqueado e o PR foi fechado sem mesclar.
 - Daqui em diante, mudanças vão por branch e pull request; o merge gera o push na `main` que dispara o deploy.
 - **Ponto de atenção (repositório público):** o repositório é público. Foram encontrados no histórico o ID da conta AWS, o endpoint do RDS, ARNs, IDs de security group e o IP de casa; não há senha nem chave de acesso. Os `.md` atuais foram limpos (IP de casa e IDs de security group viraram marcadores), mas o histórico do Git mantém os valores antigos. Decisão: não reescrever o histórico (projeto de estudo). Cuidados daqui para frente: nunca versionar senha, chave ou token; usar marcadores para IPs e IDs nos `.md`; manter a senha do RDS forte; desligar o *Public access* do RDS quando não precisar do acesso pelo computador local.
+
+## 16. Fluxo Git Flow
+
+- **Status:** em andamento (branches e regras criadas; falta praticar o ciclo completo)
+- Motivo: o usuário quis juntar vários PRs numa versão e só então acionar a esteira, e escolheu estudar o Git Flow.
+- Branches:
+
+  | Branch | Papel | Sai de | Volta para |
+  | --- | --- | --- | --- |
+  | `main` | produção; cada merge vira versão com tag `vX.Y.Z` e dispara o deploy | | |
+  | `develop` | integração dos PRs de feature | `main` | |
+  | `feature/*` | uma mudança | `develop` | `develop` |
+  | `release/X.Y.Z` | fecha a versão (ajustes finais) | `develop` | `main` e `develop` |
+  | `hotfix/*` | correção urgente | `main` | `main` e `develop` |
+
+- Rulesets (Settings → Rules): `pre-main` foi renomeado para `protect-main`; criados `protect-develop` e `protect-release` (`release/**`). Regras iguais nos três: PR obrigatório (0 aprovações, projeto individual), check `build` obrigatório e com a branch atualizada, sem force push. Em `main` e `develop` também não é possível apagar a branch; em `release/**` é, para poder limpar depois do merge. Sem lista de bypass.
+- `develop` criada a partir da `main` (commit `22480ce`).
+- Workflow: PRs para `main`, `develop` e `release/**` rodam build e testes; o deploy continua só em `push` na `main` (primeira feature: `feature/ci-gitflow`). O `push` em `develop` não foi incluído de propósito: os passos de deploy usam `if: github.event_name == 'push'` e publicariam a cada merge na `develop`.
+- `gh` (GitHub CLI) instalado com `winget` e logado; passou a abrir PRs e a acompanhar o `build` pelo terminal.
+- Ciclo completo (a praticar): `feature/x` → PR para `develop` → `release/1.0.0` a partir da `develop` → PR para `main` com merge commit → tag `v1.0.0` → PR da `main` de volta para a `develop`.
 
 ## Próximos passos
 

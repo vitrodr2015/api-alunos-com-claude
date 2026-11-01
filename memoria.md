@@ -60,6 +60,11 @@ Arquivo para retomar o contexto se a conversa for perdida. Ler junto com `PassoA
 - Já estão no histórico do Git (não somem ao editar): ID da conta AWS, endpoint do RDS, ARNs, IDs de security group e o IP de casa. Decisão: não reescrever o histórico. O `task-definition.json` mantém ID da conta, ARNs e endpoint porque a esteira precisa deles.
 - Cuidados: senha forte no RDS e *Public access* do RDS ligado só quando necessário.
 
+## Banco local (Passo 17 do playbook)
+
+- Contêiner `mysql-dev` (`mysql:8.4`), database `crud_alunos`, `utf8mb4`/`utf8mb4_unicode_ci`, volume `mysql-dev-data`, **porta 3307** no computador (o serviço Windows `MySQL84` ocupa a 3306). URL local: `jdbc:mysql://localhost:3307/crud_alunos`, usuário `root`. A senha é só de desenvolvimento e **não vai para arquivo versionado** (repositório público). Se o Docker Desktop estiver desligado, abrir antes de `docker start mysql-dev`.
+- Próximo: conectar a aplicação (JPA, driver MySQL, `application.yml` lendo `DB_URL`/`DB_USER`/`DB_PASSWORD`, `repository`), por uma `feature/*`. Playbook: o Passo 18 traz o H2 para os testes não quebrarem no CI.
+
 ## Pendências
 
 - Decidir o destino do `HELP.md`.

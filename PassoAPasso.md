@@ -281,6 +281,26 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - A `release/1.0.0` foi usada como acumulador (ideia do usuário): o PR #5 ficou aberto enquanto mais PRs podiam entrar na release, e o deploy só aconteceu no merge. No Git Flow clássico a release só recebe correções e as features novas esperam a próxima; fica como segundo exercício.
 - Pendente: apagar no GitHub as branches já mescladas (`release/1.0.0`, `feature/ci-gitflow`, `feature/aluno-8`, `ci-permissions`, `teste-ci-quebrado`). O sistema bloqueou `git push origin --delete`, então é pelo botão **Delete branch**.
 
+## 17. Banco de dados local (MySQL em Docker)
+
+- **Status:** concluído (2026-11-01)
+- Contêiner `mysql-dev`, imagem `mysql:8.4` (versão 8.4.11), `utf8mb4` e `utf8mb4_unicode_ci`, com o volume `mysql-dev-data` (os dados sobrevivem a reiniciar ou recriar o contêiner).
+- Database criado na subida (`MYSQL_DATABASE`): `crud_alunos`, o mesmo nome usado na AWS. Vazio, sem tabelas.
+- **Porta 3307 no computador** (`-p 3307:3306`), não 3306: o Windows tem o serviço **MySQL84** (MySQL Server 8.4 instalado, início automático) ocupando a 3306. A URL local fica `jdbc:mysql://localhost:3307/crud_alunos`. O `netstat -ano` não mostrou a 3306 ocupada nem as portas do `mysqld`; o erro do Docker (`Only one usage of each socket address`) foi o que revelou o conflito.
+- Senha: só de desenvolvimento, **não registrada** em arquivo do repositório (que é público). Para conectar: HeidiSQL ou DBeaver em `localhost`, porta `3307`, usuário `root`.
+- Comando usado (a senha foi passada por variável do shell, para não ficar escrita no comando):
+
+  ```bash
+  docker run -d --name mysql-dev \
+    -e MYSQL_ROOT_PASSWORD="$SENHA_DEV" -e MYSQL_DATABASE=crud_alunos \
+    -p 3307:3306 -v mysql-dev-data:/var/lib/mysql mysql:8.4 \
+    --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+  ```
+
+- Verificação feita por `docker exec`: versão 8.4.11, database `crud_alunos` com `utf8mb4`/`utf8mb4_unicode_ci`, sem tabelas. Falta conferir por um cliente gráfico (HeidiSQL ou DBeaver), que é o "Pronto quando" do passo.
+- Outros contêineres antigos na máquina (`rest-mysql`, `rest-app`, `keen_williamson`) são de projetos anteriores e estão parados; não foram tocados.
+- Comandos úteis: `docker stop mysql-dev` e `docker start mysql-dev`. Apagar o contêiner (`docker rm`) mantém os dados; só `docker volume rm mysql-dev-data` os apaga. O Compose da Fase 9 vai substituir este comando.
+
 ## Próximos passos
 
 - Conectar a aplicação ao MySQL (passo 5 da lista "Falta fazer" do passo 11).

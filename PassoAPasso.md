@@ -228,6 +228,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - Secrets do GitHub (Settings → Secrets and variables → Actions): `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY`, do usuário `GITHUB_ACTIONS_CRUD_ALUNOS`.
 - Gatilho: `push` na `main` (build, testes e deploy) e `pull_request` para a `main` (só build e testes). Push que muda só `.md` não dispara (`paths-ignore`).
 - Etapas: JDK 25 → `mvn -B verify` (roda os testes) → `docker compose build` → (só em push) login na AWS e no ECR → envio da imagem para `respositorio-crud-alunos` com a tag do commit e `latest` → renderiza `apicrud-alunos/task-definition.json` com a imagem do commit → registra a nova revisão e atualiza `service-crud-alunos` no `cluster-crud-alunos`, esperando o Service estabilizar.
+- Permissões: `permissions: contents: read` (menor privilégio). A esteira só lê o repositório; o deploy usa as chaves da AWS, não o `GITHUB_TOKEN`.
 - Publicação no Docker Hub: deixada comentada, opcional.
 - Resultado: Task Definition `crud-alunos-task-definition:2`, com a imagem marcada com o hash do commit.
 - A esteira não altera o *Desired tasks*; com 0, termina verde, mas nenhuma aplicação sobe.
@@ -241,6 +242,15 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - O RDS parado religa sozinho após 7 dias (previsto: cerca de 2026-11-06).
 - Custo com tudo ligado: tarefa de cerca de US$ 1,30 por dia, mais o RDS. Ao terminar, voltar *Desired tasks* para 0 e parar o RDS.
 - Passo a passo e avisos: `Duvida-CICD.md`, seção 15.
+
+## 15. Proteger a branch principal
+
+- **Status:** regra criada pelo usuário no GitHub; falta confirmar o teste de bloqueio
+- Em Settings → Rules → Rulesets, ruleset `pre-main`, alvo: branch padrão (`main`), lista de bypass vazia.
+- Regras marcadas: exigir pull request antes de mesclar (aprovações em 0, projeto individual), exigir o check **`build`** verde (nome do job em `.github/workflows/continuous-deployment.yml`) com a branch atualizada, bloquear force push e bloquear a exclusão da `main`.
+- Limitação: em repositório **privado** de conta gratuita o GitHub não aplica rulesets (aviso na própria tela). O aviso deixou de aparecer depois da criação; confirmar a visibilidade do repositório.
+- Teste de bloqueio: branch `teste-ci-quebrado` com um teste quebrado de propósito (nunca mesclar). O PR deve ficar com o `build` vermelho e o Merge bloqueado. **Resultado ainda não confirmado.**
+- Daqui em diante, mudanças vão por branch e pull request; o merge gera o push na `main` que dispara o deploy.
 
 ## Próximos passos
 

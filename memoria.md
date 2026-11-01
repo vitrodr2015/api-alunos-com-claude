@@ -40,7 +40,7 @@ Arquivo para retomar o contexto se a conversa for perdida. Ler junto com `PassoA
 
 - Coleção e ambiente do Postman em `postman/` (raiz do repositório), com 10 alunos de exemplo. Validados contra a aplicação rodando (36 requisições ok).
 
-- `AlunoService` usa `CopyOnWriteArrayList` e já sobe com 7 alunos fixos (ids 1 a 7; os 5 primeiros são os da carga do Postman, o 6 é Felipe Rocha e o 7 é Gustavo Alves). Os próximos criados começam no id 8. `AlunoControllerTests` é `@SpringBootTest` + `@AutoConfigureMockMvc`.
+- `AlunoService` usa `CopyOnWriteArrayList` e já sobe com 8 alunos fixos (ids 1 a 8; os 5 primeiros são os da carga do Postman, o 6 é Felipe Rocha, o 7 é Gustavo Alves e o 8 é Helena Barros). Os próximos criados começam no id 9. `AlunoControllerTests` é `@SpringBootTest` + `@AutoConfigureMockMvc`.
 
 - Boot 4 / Spring 7 usa Jackson 3 (`tools.jackson`): não seguir literalmente receitas do Jackson 2 (`AbstractJackson2HttpMessageConverter`, `com.fasterxml`). Conversores de XML e YAML já existem no Spring; `WebConfig` define JSON como padrão e faz o YAML aceitar também `application/x-yaml`.
 - Erros da API (`ErrorResponse`) ficam sempre em JSON, mesmo com `Accept` de XML/YAML.

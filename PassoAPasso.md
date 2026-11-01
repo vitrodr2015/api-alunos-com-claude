@@ -297,9 +297,18 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
     --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
   ```
 
-- Verificação feita por `docker exec`: versão 8.4.11, database `crud_alunos` com `utf8mb4`/`utf8mb4_unicode_ci`, sem tabelas. Falta conferir por um cliente gráfico (HeidiSQL ou DBeaver), que é o "Pronto quando" do passo.
+- Verificação feita por `docker exec`: versão 8.4.11, database `crud_alunos` com `utf8mb4`/`utf8mb4_unicode_ci`, sem tabelas. Conferido também pelo usuário no HeidiSQL (`localhost`, porta 3307, `root`): conectou e viu o schema `crud_alunos` vazio, o "Pronto quando" do passo.
 - Outros contêineres antigos na máquina (`rest-mysql`, `rest-app`, `keen_williamson`) são de projetos anteriores e estão parados; não foram tocados.
 - Comandos úteis: `docker stop mysql-dev` e `docker start mysql-dev`. Apagar o contêiner (`docker rm`) mantém os dados; só `docker volume rm mysql-dev-data` os apaga. O Compose da Fase 9 vai substituir este comando.
+
+## 18. Dependências de JPA e do driver
+
+- **Status:** concluído nesta etapa (branch `feature/jpa-dependencias`); a aplicação **real** só sobe depois do passo seguinte do playbook (datasource)
+- `pom.xml`: `spring-boot-starter-data-jpa`, `com.mysql:mysql-connector-j` (escopo `runtime`; o `mysql-connector-java` é o antigo, descontinuado) e `com.h2database:h2` (escopo `test`).
+- `src/test/resources/application.yml` (novo): `spring.application.name`, `jpa.hibernate.ddl-auto: create-drop` e `jpa.open-in-view: false`. Sem `datasource` nesse arquivo, o Spring Boot usa o H2 em memória nos testes. O arquivo de teste substitui o de `src/main/resources` durante os testes (mesmo nome, vence o `test-classes`).
+- Resultado: 52 testes passando com o H2 (`ApicrudAlunosApplicationTests` e os `@SpringBootTest` sobem o contexto inteiro com o JPA). Na primeira rodada, logo depois de mudar o `pom.xml`, o Maven terminou com `BUILD FAILURE` por falha de teste; o motivo não foi guardado. Três rodadas seguintes passaram sem falhas. Fica anotado como instabilidade não explicada; se voltar, guardar o relatório em `target/surefire-reports`.
+- **Atenção ao fluxo:** sem `datasource` no `application.yml` principal, a aplicação real falha ao subir (`Failed to determine a suitable driver class`). Como o merge na `main` faz deploy, **este passo não pode ir para a `main` sem o datasource**: os dois passos têm de entrar juntos na mesma release.
+- Ainda não há `@Entity`: o `Aluno` continua em memória até o repository entrar.
 
 ## Próximos passos
 

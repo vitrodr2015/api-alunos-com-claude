@@ -9,6 +9,10 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# A esteira só lê o repositório (menor privilégio)
+permissions:
+  contents: read
+
 jobs:
 
   build:

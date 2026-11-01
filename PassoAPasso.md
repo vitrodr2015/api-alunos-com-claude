@@ -310,6 +310,22 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Atenção ao fluxo:** sem `datasource` no `application.yml` principal, a aplicação real falha ao subir (`Failed to determine a suitable driver class`). Como o merge na `main` faz deploy, **este passo não pode ir para a `main` sem o datasource**: os dois passos têm de entrar juntos na mesma release.
 - Ainda não há `@Entity`: o `Aluno` continua em memória até o repository entrar.
 
+## 19. Datasource sem expor segredos
+
+- **Status:** concluído (branch `feature/datasource`)
+- `src/main/resources/application.yml`: `datasource` com `driver-class-name: com.mysql.cj.jdbc.Driver`, `url: ${DB_URL:...}`, `username: ${DB_USER:root}` e `password: ${DB_PASSWORD}` **sem valor padrão**.
+- Padrão de variáveis escolhido: as próprias (`DB_URL`, `DB_USER`, `DB_PASSWORD`), as mesmas que a Task Definition da AWS já usa. Não usamos as nativas do Spring (`SPRING_DATASOURCE_*`).
+- Valor padrão da URL (só para desenvolvimento): `jdbc:mysql://localhost:3307/crud_alunos?createDatabaseIfNotExist=true`, o MySQL do Docker do passo 17 (porta 3307, não 3306). O usuário padrão é `root`. Na AWS, `DB_URL` vem da Task Definition.
+- **Descoberta importante:** o Spring Boot **não falha** quando `${DB_PASSWORD}` não existe. Ele envia o texto literal `${DB_PASSWORD}` como senha, o MySQL responde `Access denied for user 'root' (using password: YES)` e o erro final aparece como `Unable to determine Dialect without JDBC metadata`, sem citar a senha. Isso não cumpre o "Pronto quando" do passo (erro claro).
+- Correção: em `ApicrudAlunosApplication.main`, um listener de `ApplicationEnvironmentPreparedEvent` lança `IllegalStateException` com a mensagem "A variável de ambiente DB_PASSWORD não foi definida..." se houver `spring.datasource.url` e a senha estiver vazia. Primeira tentativa foi um `@Component` com `@Value`, mas ele rodava depois de o Hibernate tentar conectar, então não servia. No `main`, os testes (que usam o H2 e não passam por ele) não são afetados.
+- Verificado (2026-11-01):
+  - sem `DB_PASSWORD`: a aplicação para na hora com a mensagem clara, sem tentar conectar;
+  - com `DB_PASSWORD` e o `mysql-dev` ligado: sobe em cerca de 4 s, conecta no MySQL e `GET /alunos/8` devolve Helena Barros;
+  - `mvnw test`: 52 testes passando (H2);
+  - `grep` por senha, chave e token no repositório: só nomes e ARNs de secret, nenhum valor. A senha de desenvolvimento não aparece em nenhum arquivo versionado.
+- Rodar pela IDE ou pelo terminal agora exige a variável: no IntelliJ, Run → Edit Configurations → Environment variables (`DB_PASSWORD=...`); no terminal, `export DB_PASSWORD=...` antes de `./mvnw spring-boot:run`.
+- **Cuidado com o deploy:** a aplicação passa a **exigir o banco no arranque**. Na AWS, o RDS precisa estar `Available` antes do Service subir, senão a tarefa cai ao iniciar. A Task Definition já tem `DB_URL`, `DB_USER` e `DB_PASSWORD` (esta última via Secrets Manager), com os mesmos nomes. O `Aluno` continua em memória: o banco só é conectado, ainda sem tabelas nem `repository`.
+
 ## Próximos passos
 
 - Conectar a aplicação ao MySQL (passo 5 da lista "Falta fazer" do passo 11).

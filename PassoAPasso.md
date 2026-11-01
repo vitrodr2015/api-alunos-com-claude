@@ -126,7 +126,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 
 - **Status:** concluído, ainda sem commit
 - `AlunoService` passou a guardar os alunos numa `CopyOnWriteArrayList` (antes era um mapa em memória).
-- A aplicação já sobe com 5 alunos fixos (ids 1 a 5): Ana Souza, Bruno Lima, Carla Dias, Diego Martins e Eduarda Costa. Os próximos criados começam no id 6.
+- A aplicação sobe com alunos fixos. Começou com 5 (ids 1 a 5): Ana Souza, Bruno Lima, Carla Dias, Diego Martins e Eduarda Costa. Depois entraram o id 6 (Felipe Rocha, junto com a esteira) e o id 7 (Gustavo Alves, `gustavo.alves@escola.com`, commit `d539331`). Os próximos criados começam no id 8. O teste `AlunoControllerTests` confere os registros fixos, inclusive o 7.
   - Na coleção do Postman, os 5 primeiros itens da carga inicial passam a responder 409 (e-mail já existe); os 5 últimos criam normalmente.
 - `AlunoControllerTests` agora usa `@SpringBootTest` + `@AutoConfigureMockMvc` (antes `@WebMvcTest`), com a aplicação inteira. Cobre busca, listagem, criação, atualização, remoção, 404 e 400, mais os registros fixos. 24 testes no total; a suíte inteira tem 36, todos passando.
 
@@ -159,7 +159,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 
 ## 11. Infraestrutura na AWS (tutorial `AWS-Esteira CICD.md`)
 
-- **Status:** em andamento (seções 1 a 7 do tutorial feitas; 8 em diante pendentes)
+- **Status:** em andamento (seções 1 a 11 e 15 do tutorial feitas; faltam 12 a 14 e a conexão da aplicação com o MySQL)
 - Os detalhes de tela e as diferenças em relação ao tutorial estão no `Duvida-CICD.md`. Aqui ficam a ordem, as decisões e o porquê.
 - Região: N. Virginia (`us-east-1`). Cadeia final: GitHub Actions → imagem no ECR → ECS Fargate (aplicação) → RDS MySQL (banco), com a senha no Secrets Manager.
 
@@ -177,6 +177,9 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 | 7.2 `task-definition.json` | Arquivo para a esteira, criado a partir do JSON da revisão `:1` | `apicrud-alunos/task-definition.json` |
 | 9. Service (ECS) | Service Fargate com 1 tarefa, grupo `security-group-crud-alunos`, IP público ligado e sem subnets de Local Zone | `service-crud-alunos` |
 | 8. Imagem no ECR | Imagem do `Dockerfile` enviada com a tag `latest`, usando o perfil `crud-alunos` da AWS CLI | `respositorio-crud-alunos:latest` (digest `sha256:49b1057e...`) |
+| 10. Teste | `GET /alunos` pelo IP público da tarefa, no Postman (sem Swagger e sem login) | porta 8080 |
+| 11. Esteira | Workflow do GitHub Actions + secrets `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY` | `.github/workflows/continuous-deployment.yml`; deploy gerou `crud-alunos-task-definition:2` |
+| 15. Ligar e desligar | Desligado em 2026-10-30 (Desired tasks = 0, RDS parado); ligado de novo em 2026-11-01 (Desired tasks = 1) | `service-crud-alunos`, `database-crud-alunos` |
 
 ### Decisões e por quê
 
@@ -203,8 +206,8 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 3. ~~Seção 9: criar o Service~~ (feito; a tarefa só subiu depois de dar à `ecsTaskExecutionRole` a permissão de ler o secret).
 4. ~~Seção 10: testar a API pelo IP público (Postman)~~ (feito; sem Swagger nem login, o teste é `GET /alunos`).
 5. Conexão com o MySQL na aplicação: JPA, driver, `application.yml` lendo `DB_URL`/`DB_USER`/`DB_PASSWORD`, `repository`.
-6. Seção 11: workflow do GitHub Actions (`.github/workflows`; resolver antes a pasta `.github/` ignorada) e cadastro dos secrets.
-7. Seções 12 a 15: rotina, problemas comuns, limpeza e ligar/desligar (custos).
+6. ~~Seção 11: workflow do GitHub Actions e secrets~~ (feito, ver "Esteira" abaixo; a pasta `.github/` está versionada e sem regra de ignore).
+7. Seções 12 a 14 (rotina, problemas comuns, limpeza) ainda não executadas. A seção 15 já foi usada (ligar e desligar).
 
 ## 12. Dockerfile
 
@@ -218,7 +221,29 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Teste local:** `docker build -t crud-alunos-local .` e `docker run -p 8080:8080 crud-alunos-local`. A aplicação subiu em 4 segundos, `GET /alunos/1` devolveu a Ana Souza, um id inexistente devolveu o erro 404 em português, o usuário no contêiner é `app` e a arquitetura é x86_64 (a mesma da Task Definition). Imagem com 521 MB.
 - Ainda sem `HEALTHCHECK`: o projeto não tem o Actuator.
 
+## 13. Esteira (GitHub Actions)
+
+- **Status:** concluído; a esteira rodou e fez o deploy (commit `8fdf837`, "Esteira CI/CD e mais um aluno fixo")
+- Arquivos: `.github/workflows/continuous-deployment.yml` e `apicrud-alunos/docker-compose.yml` (dá o nome `vitrodr/crud-alunos` à imagem gerada).
+- Secrets do GitHub (Settings → Secrets and variables → Actions): `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY`, do usuário `GITHUB_ACTIONS_CRUD_ALUNOS`.
+- Gatilho: `push` na `main` (build, testes e deploy) e `pull_request` para a `main` (só build e testes). Push que muda só `.md` não dispara (`paths-ignore`).
+- Etapas: JDK 25 → `mvn -B verify` (roda os testes) → `docker compose build` → (só em push) login na AWS e no ECR → envio da imagem para `respositorio-crud-alunos` com a tag do commit e `latest` → renderiza `apicrud-alunos/task-definition.json` com a imagem do commit → registra a nova revisão e atualiza `service-crud-alunos` no `cluster-crud-alunos`, esperando o Service estabilizar.
+- Publicação no Docker Hub: deixada comentada, opcional.
+- Resultado: Task Definition `crud-alunos-task-definition:2`, com a imagem marcada com o hash do commit.
+- A esteira não altera o *Desired tasks*; com 0, termina verde, mas nenhuma aplicação sobe.
+- Detalhes e diferenças em relação ao tutorial: `Duvida-CICD.md`, seção 11.
+
+## 14. Ligar e desligar o ambiente AWS
+
+- **Status:** feito e usado
+- **Desligar (2026-10-30):** Service com *Desired tasks* = 0; RDS `database-crud-alunos` parado (*Stop temporarily*). O banco de sobra `vitrodr-db-server` foi apagado.
+- **Ligar (2026-11-01):** RDS → Start; Service → Update → *Desired tasks* = 1 (campo que fica na página do **Service**, não na da Task Definition); IP novo na aba Tasks; teste de `GET /alunos` no Postman, ok.
+- O RDS parado religa sozinho após 7 dias (previsto: cerca de 2026-11-06).
+- Custo com tudo ligado: tarefa de cerca de US$ 1,30 por dia, mais o RDS. Ao terminar, voltar *Desired tasks* para 0 e parar o RDS.
+- Passo a passo e avisos: `Duvida-CICD.md`, seção 15.
+
 ## Próximos passos
 
-- Commitar o que está pendente (serialização, `Dockerfile`, `AWS-Esteira CICD.md`, `Duvida-CICD.md`, `task-definition.json`, `.md`).
-- Seguir a lista "Falta fazer" do passo 11.
+- Conectar a aplicação ao MySQL (passo 5 da lista "Falta fazer" do passo 11).
+- Seções 12 a 14 do tutorial (rotina, problemas comuns, limpeza).
+- Decidir sobre as sobras na AWS (`rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos`).

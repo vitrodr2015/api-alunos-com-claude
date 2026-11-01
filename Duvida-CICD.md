@@ -21,7 +21,7 @@
 | **Secret da senha do banco** | `rest-with-claude/db-password` | `secrets_crud_alunos/db-password` |
 | **Política de leitura do secret** | `LerSecretDB` | `LerSecretDB_CrudAlunos` |
 | **Security group da aplicação** | `rest-with-claude-app-sg` | `security-group-crud-alunos` |
-| **Task Definition (family)** | `rest-with-claude-spring-taskdefinition` | `crud-alunos-task-definition` (revisão `:1`) |
+| **Task Definition (family)** | `rest-with-claude-spring-taskdefinition` | `crud-alunos-task-definition` (`:1` manual; `:2` em diante criadas pela esteira) |
 | **Contêiner** | `Container-vitrodr` | `container-crudalunos` |
 | **Log group** | `/ecs/rest-with-claude-spring-taskdefinition` | `/ecs/crud-alunos-task-definition` |
 | **Role de execução da task** | `ECS-role-bd3e720b` ou `ecsTaskExecutionRole` | `ecsTaskExecutionRole` |
@@ -29,6 +29,8 @@
 | **Perfil da AWS CLI** | (não usa; `aws configure` direto) | `crud-alunos` |
 | **Imagem local** | `rest-with-claude` | `crud-alunos-local` |
 | **Classe da instância** | `db.t4g.micro` | `db.t4g.micro` |
+| **Workflow da esteira** | `.github/workflows/continuous-deployment.yml` | mesmo nome de arquivo, conteúdo adaptado (ver seção 11) |
+| **Imagem gerada pelo `docker compose`** | (não informada) | `vitrodr/crud-alunos` (`apicrud-alunos/docker-compose.yml`) |
 
 ## Andamento
 
@@ -47,6 +49,9 @@
 | 8. Enviar a primeira imagem para o ECR | ✅ Feita (imagem `latest` enviada para `respositorio-crud-alunos`) |
 | 9. Criar o Service (ECS) | ✅ Feita (`service-crud-alunos`, tarefa **Running** após corrigir a permissão do secret) |
 | 10. Testar a aplicação | ✅ Feita (API respondendo pelo IP público, testada no Postman) |
+| 11. Ligar a esteira (GitHub Actions) | ✅ Feita (a esteira rodou e fez o deploy: Task Definition `:2`) |
+| 15.1 Ligar o ambiente | ✅ Feita em 2026-11-01 (Service com 1 tarefa, IP novo testado no Postman) |
+| 15.2 Desligar o ambiente | ✅ Feita em 2026-10-30 (Desired tasks = 0 e RDS parado) |
 
 ---
 
@@ -388,6 +393,67 @@ Ao final, a porta 3306 do grupo `default` ficou com estas origens:
 
 ---
 
+## 11. Ligar a esteira (GitHub Actions)
+
+**Passo a passo executado** (a esteira rodou e o deploy chegou ao ECS):
+
+1. Repositório no GitHub → **Settings** → **Secrets and variables** → **Actions** → aba **Secrets** → **New repository secret**. Crie `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY` com a chave do usuário `GITHUB_ACTIONS_CRUD_ALUNOS` (seção 3.2). Os nomes têm de ser exatamente esses e ficar em **Secrets**, não em *Variables*.
+2. O workflow fica em `.github/workflows/continuous-deployment.yml`. Neste projeto ele foi montado à parte e adaptado, e faz, nesta ordem:
+    - `actions/checkout@v4`.
+    - **JDK 25** (Temurin, com cache do Maven). A versão tem de ser igual à do `pom.xml` e à do `Dockerfile`.
+    - `mvn -B verify` na pasta `apicrud-alunos`: compila e roda os testes. Se um teste falhar, nada é publicado.
+    - `docker compose build` na pasta `apicrud-alunos`: gera a imagem `vitrodr/crud-alunos`, nome definido no `docker-compose.yml`.
+    - (Publicação no Docker Hub: opcional, deixada comentada no arquivo.)
+    - Só em **push** na `main` (PR não faz deploy e não acessa os secrets): login na AWS, login no ECR, `docker tag` e `docker push` para `respositorio-crud-alunos`, com a tag do **commit** (`github.sha`) e também `latest`.
+    - `amazon-ecs-render-task-definition`: pega `apicrud-alunos/task-definition.json` (seção 7.2), troca a imagem do contêiner `container-crudalunos` pela do commit e gera a nova definição.
+    - `amazon-ecs-deploy-task-definition`: registra a nova revisão e atualiza o Service `service-crud-alunos` no cluster `cluster-crud-alunos`, com `wait-for-service-stability: true`.
+3. Regra `paths-ignore: '**.md'`: push que muda **só** arquivos `.md` não dispara a esteira.
+4. Faça `git push` na `main` e acompanhe na aba **Actions** do GitHub.
+
+**Resultado conferido no ECS:** a Task Definition passou para `crud-alunos-task-definition:2`, com a imagem `respositorio-crud-alunos:<hash do commit>` (a tag é o hash do commit `8fdf837`), as 4 variáveis (`DB_USER`, `TZ`, `DB_URL` e `DB_PASSWORD` como `valueFrom`) e a `ecsTaskExecutionRole`. O aluno 6 entrou na API.
+
+> ⚠️ **Antes do push**, deixe o ambiente ligado (seção 15.1). A esteira **não altera** *Desired tasks*: com `0` ela termina verde, mas nenhuma aplicação sobe.
+
+> ⚠️ A cada deploy a tarefa é trocada e o **IP público muda**.
+
+> 💡 A pasta `.github/` chegou a aparecer como ignorada no `git status --ignored`. Hoje o workflow está versionado (`git ls-files` lista o arquivo) e `git check-ignore -v .github` não devolve regra nenhuma, então não foi preciso mexer no `.gitignore`.
+
+**Para o tutorial novo:** dizer que o workflow precisa ser adaptado ao projeto (versão do Java, pasta do projeto, nome da imagem do `docker compose`, nomes do ECR, do contêiner, do Service e do cluster); avisar que o `task-definition.json` precisa existir e estar versionado; avisar que a tag do deploy é o hash do commit e que `latest` é só uma cópia; lembrar que *Desired tasks* não é alterado pela esteira.
+
+---
+
+## 15. Ligar e desligar o ambiente (para estudar sem gastar)
+
+### 15.1 Ligar
+
+**Passo a passo executado em 2026-11-01** (a tarefa subiu e a API respondeu no Postman):
+
+1. **RDS:** **Aurora and RDS** → **Databases** → `database-crud-alunos` → **Actions** → **Start**, e esperar **Available**. *(Hoje a aplicação guarda os alunos em memória e não conecta no banco, então a tarefa sobe mesmo com o RDS parado. Mantenha a ordem do tutorial para já criar o hábito.)*
+2. **Service:** **Elastic Container Service** → **Clusters** → `cluster-crud-alunos` → aba **Services** → `service-crud-alunos` → **Update** → **Desired tasks = 1** → **Update**.
+3. Aba **Tasks** do cluster (filtro *Any desired status*): esperar **Last status = Running**.
+4. **IP novo:** coluna **Public IP** da tarefa, ou ID da tarefa → **Configuration** → **Public IP**.
+5. **Testar:** `http://<IP>:8080/alunos` no Postman, trocando só o valor de `baseUrl` (sem barra no fim).
+
+> 🔴 **Engano que aconteceu:** ao procurar o *Desired tasks*, a página aberta foi a da **Task Definition** (`crud-alunos-task-definition:2`), que não tem esse campo. Ele fica na página do **Service**: Clusters → cluster → Services → o Service → **Update**.
+
+> 💡 O teste em `/swagger-ui/index.html` do tutorial não se aplica (o projeto não tem Swagger): use `GET /alunos`.
+
+> ⚠️ Se o teste der timeout, o motivo mais provável é o seu IP de casa ter mudado: em **EC2 → Security Groups → `security-group-crud-alunos`**, edite a regra da 8080 e escolha **My IP** de novo.
+
+### 15.2 Desligar
+
+**Passo a passo executado em 2026-10-30:**
+
+1. **Aplicação:** Service → **Update** → **Desired tasks = 0**. Conferir na aba **Tasks** que não há mais tarefas.
+2. **RDS:** **Databases** → `database-crud-alunos` → **Actions** → **Stop temporarily**, e esperar **Stopped**.
+3. Também foi apagado o banco de sobra `vitrodr-db-server` (us-east-1d), de uma tentativa anterior.
+
+> ⚠️ **O RDS parado religa sozinho depois de 7 dias.** O nosso foi parado em 2026-10-30, então volta por volta de **2026-11-06** se não for usado: pare de novo ou apague.
+
+**Para o tutorial novo:** destacar que *Desired tasks* fica na página do **Service** (não da Task Definition), que o IP muda a cada tarefa e que o teste depende de a aplicação ter Swagger ou não. As seções 15.3 e 15.4 ainda não foram executadas.
+
+---
+
 ## Dúvidas abertas
 
 | **Dúvida** | **Onde** | **Como resolver** |
@@ -397,6 +463,8 @@ Ao final, a porta 3306 do grupo `default` ficou com estas origens:
 | O console está sendo usado com o **usuário raiz** da conta (`registeredBy` = `...:root`). | Geral | Criar um usuário IAM administrador com MFA para o dia a dia; deixar o raiz só para emergências. |
 | Existe um grupo `rest-with-claude-app-sg` (nome do tutorial, de uma tentativa anterior) com regra na 3306 do banco. Manter ou apagar? | Seção 6.2 | Em **EC2 → Security Groups**, abra o grupo e veja em *Network interfaces* se algo o usa. Se nada usar, apague a regra da 3306 e depois o grupo. |
 | Qual origem foi usada na porta 8080 do `security-group-crud-alunos`: `0.0.0.0/0` ou **My IP**? | Seção 6.1 | Conferir em EC2 → Security Groups → Inbound rules e anotar. |
+| O cluster `rest-with-claude-spring` (sobra do tutorial original, com 1 Service e *Container Insights enhanced*) continua existindo, com 0 tarefas. Apagar? | Geral | Em **ECS → Clusters**, apagar o Service e depois o cluster, ou ao menos desligar o *Container Insights*. |
+| Os perfis `default` e `crud-alunos` da AWS CLI são o mesmo usuário (`GITHUB_ACTIONS_CRUD_ALUNOS`), sem permissão de RDS. O `default` é necessário? | Seção 8 | Conferir com `aws sts get-caller-identity --profile default`; se for só duplicata, remover do `~/.aws`. |
 | O repositório ficou com o nome `respositorio-crud-alunos` (falta um "i" em "repositorio"). Manter ou recriar? | Seção 2 | Recriar agora (o repositório está vazio) evita carregar o erro para a Task Definition, o `docker push` e o workflow. Atualizar a tabela de valores conforme a decisão. |
 
 ## Problemas e diferenças encontradas
@@ -414,4 +482,6 @@ Ao final, a porta 3306 do grupo `default` ficou com estas origens:
 | `error from registry: Your authorization token has expired` no `docker push` | O login no ECR falhou ou expirou (vale 12 horas). Refaça o login e confirme `Login Succeeded` antes do push. |
 | Login falha mesmo com o perfil criado | Confira se a Access Key ID e a Secret Access Key não foram digitadas **trocadas** ou com o **nome do usuário** no lugar da chave. Refaça `aws configure --profile crud-alunos`. |
 | `aws: [ERROR]: ... required: command` ao rodar `aws --verison` | Erro de digitação: o certo é `aws --version`. |
+| Esteira verde, mas a API não responde | O Service está com **Desired tasks = 0**, ou o IP mudou. Ligue o Service (seção 15.1) e pegue o IP novo. |
+| Procuro **Desired tasks** e a tela não tem | Você está na página da **Task Definition**. Vá em Clusters → cluster → Services → o Service → **Update**. |
 | Não acho o campo "Endpoint" | Aba **Connectivity & security** → painel **Connect using** → **Endpoints**. |

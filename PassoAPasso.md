@@ -594,6 +594,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Pronto quando, comprovado:** `mvnw -B clean verify`, com `JWT_SECRET` e `DB_PASSWORD` **fora do ambiente** (como na esteira): 160 testes, 0 falhas, `BUILD SUCCESS`. Também passou em ordem aleatória de classes (`-Dsurefire.runOrder=random`), e o `docker compose build` (passo da esteira) terminou com sucesso com as dependências de segurança.
 - **Resumo da Fase 6 até aqui** (passos 28 a 33 do playbook, nossa numeração 30 a 35): dependências → usuário e permissões (`V4`) → hash de senha BCrypt delegante → provedor JWT → filtro e configuração → testes ajustados. 160 testes (eram 88 antes da segurança), 72 deles novos. Ainda **não há** endpoint de login (`/auth/signin`), nem usuário no banco: a API fica 100% protegida e ninguém consegue entrar até os próximos passos.
 - **Atenção para a produção:** esta branch muda o comportamento da API para quem a chama (tudo passa a exigir token) e exige `JWT_SECRET` para a aplicação subir. **Não fazer release com isso antes de existir o login e o segredo na AWS**, senão a API em produção fica inacessível e a tarefa nem sobe (ver o planejamento no `memoria.md`).
+- **PR #27 mesclado na `develop`** (merge commit `4063d2d`, 2026-11-02, `build` verde em 1m37s). A `main` e a AWS continuam na release 1.2.0, sem segurança.
 
 ## Próximos passos
 

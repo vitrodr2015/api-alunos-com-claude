@@ -9,7 +9,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import br.com.vitor.apicrud_alunos.dto.PageResponse;
 import br.com.vitor.apicrud_alunos.exception.ConflictException;
 import br.com.vitor.apicrud_alunos.exception.InvalidRequestException;
 import br.com.vitor.apicrud_alunos.exception.ResourceNotFoundException;
@@ -40,15 +39,13 @@ public class AlunoService {
 	@Transactional(readOnly = true)
 	// page, size e sort chegam já resolvidos pelo Spring (padrão e máximo vêm do application.yml);
 	// ordenar por um campo que não existe lança PropertyReferenceException, tratada como 400
-	public PageResponse<Aluno> listar(String nome, Boolean ativo, Pageable pageable) {
+	public Page<Aluno> listar(String nome, Boolean ativo, Pageable pageable) {
 		String filtroNome = nome == null ? "" : nome.trim();
 		Pageable ordenado = comDesempatePeloId(pageable);
 
-		Page<Aluno> pagina = ativo == null
+		return ativo == null
 				? repository.findByNomeContainingIgnoreCase(filtroNome, ordenado)
 				: repository.findByNomeContainingIgnoreCaseAndAtivo(filtroNome, ativo, ordenado);
-		return new PageResponse<>(pagina.getContent(), pagina.getNumber(), pagina.getSize(),
-				pagina.getTotalElements(), pagina.getTotalPages());
 	}
 
 	@Transactional(readOnly = true)

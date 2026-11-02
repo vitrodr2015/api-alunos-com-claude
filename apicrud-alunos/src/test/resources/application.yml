@@ -5,6 +5,8 @@ spring:
   flyway:
     enabled: false
   jpa:
+    # o data.sql só pode rodar depois de o Hibernate criar a tabela (ddl-auto: create-drop)
+    defer-datasource-initialization: true
     hibernate:
       ddl-auto: create-drop
     open-in-view: false

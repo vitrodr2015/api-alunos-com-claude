@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import br.com.vitor.apicrud_alunos.security.InvalidTokenException;
+
 @WebMvcTest(GlobalExceptionHandlerTests.FakeController.class)
 @Import({ GlobalExceptionHandler.class, GlobalExceptionHandlerTests.FakeController.class })
 class GlobalExceptionHandlerTests {
@@ -43,6 +45,16 @@ class GlobalExceptionHandlerTests {
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.status").value(400))
 				.andExpect(jsonPath("$.mensagem").value("Dados inválidos"));
+	}
+
+	@Test
+	void tokenInvalidoRetorna401ComOMesmoFormatoDeErro() throws Exception {
+		mockMvc.perform(get("/fake/token-invalido"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.status").value(401))
+				.andExpect(jsonPath("$.erro").value("Não autenticado"))
+				.andExpect(jsonPath("$.mensagem").value("Token expirado"))
+				.andExpect(jsonPath("$.dataHora").exists());
 	}
 
 	@Test
@@ -148,6 +160,11 @@ class GlobalExceptionHandlerTests {
 		@GetMapping(value = "/outro/somente-json", produces = MediaType.APPLICATION_JSON_VALUE)
 		String somenteJson() {
 			return "ok";
+		}
+
+		@GetMapping("/fake/token-invalido")
+		String tokenInvalido() {
+			throw new InvalidTokenException("Token expirado");
 		}
 
 		@GetMapping("/fake/erro")

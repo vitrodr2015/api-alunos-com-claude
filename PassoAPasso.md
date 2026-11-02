@@ -497,6 +497,19 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Os dados de exemplo agora estão no RDS.** Para remover, só com uma migration nova (`V4`) que apague as linhas; a `V3` não se edita.
 - **Sobra para limpar:** a branch remota `release/1.2.0` (o sistema bloqueou o apagamento porque não foi pedido; é só pedir).
 
+## 30. Segurança, parte 1: dependências (passo 28 do playbook)
+
+- **Status:** dependências adicionadas; **build vermelho de propósito** até o passo 33 do playbook (ajuste dos testes). A branch `feature/seguranca` **não vai para a `develop` enquanto os testes estiverem falhando**; os passos 28 a 33 do playbook ficam todos nela, com um commit por passo, e o PR só abre quando o `build` voltar a ficar verde.
+- `pom.xml`: `spring-boot-starter-security` (Spring Security 7.1.2, gerenciado pelo Boot 4.1.2), `com.auth0:java-jwt:4.4.0` (versão fixa do playbook) e `spring-security-test` (escopo `test`).
+- **Observações sobre as versões:**
+  - O Boot 4 também tem o starter de teste próprio `spring-boot-starter-security-test`; o playbook pede `spring-security-test`, que funciona com a versão gerenciada, e foi esse que usei.
+  - O `java-jwt` 4.4.0 puxa o `jackson-databind` (Jackson **2**) só em tempo de execução. O projeto usa o Jackson **3** (`tools.jackson`) do Boot 4; os pacotes são diferentes, então convivem. Já existe o `java-jwt` 4.6.2, mas o playbook fixa 4.4.0 e mantive.
+- **O aviso do passo, comprovado** (2026-11-02):
+  - **Testes:** `mvnw clean test` → 59 falhas em 88 (`ContentNegotiationTests` 12, `SerializationTests` 7, `AlunoControllerTests` 40). Os `GET` recebem **401** e as escritas (`POST`, `PUT`, `PATCH`, `DELETE`) recebem **403** no `MockMvc`. Não quebraram `GlobalExceptionHandlerTests` (11), `AlunoServiceTests` (17) nem `ApicrudAlunosApplicationTests` (1).
+  - **Aplicação real** (MySQL local): todas as rotas dão **401**, inclusive `POST` e `DELETE` e a raiz `/`, com `WWW-Authenticate: Basic` e **corpo vazio**, ou seja, **não** vem o nosso `ErrorResponse` em JSON. Isso será tratado quando o 401/403 em JSON entrar (pendência antiga da lista, "Erros que faltam").
+  - O Spring Security cria sozinho um usuário `user` com senha gerada, anunciada no log na subida (`Using generated security password`). É o comportamento padrão, e será substituído pelo `UserDetailsService` do passo 29 do playbook; a senha gerada não foi usada nem registrada.
+- **Efeito na AWS (ainda não executado, só para planejar):** quando a segurança for para uma release, a API pública deixa de responder sem token; o Postman e o teste pelo IP vão precisar de login; e o `JWT_SECRET` (passo 31, sem valor padrão) exige **um segredo novo no Secrets Manager, uma variável nova na Task Definition e permissão de leitura dele na role de execução**. Sem isso, a tarefa não sobe e o deploy trava. Isso entra no `Duvida-CICD.md` quando for executado.
+
 ## Próximos passos
 
 - Continuar o playbook: o usuário cola o próximo passo (a numeração do playbook é diferente da nossa).

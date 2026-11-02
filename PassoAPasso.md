@@ -406,11 +406,12 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Teste da API na AWS** (IP público da tarefa, porta 8080): `GET /alunos` devolveu 8 alunos (`totalElements` 8); `GET /alunos/8` devolveu Helena Barros; id inexistente deu 404. Ou seja, o Flyway rodou no RDS (tabela `aluno` e `V2`) e a aplicação conectou com a senha do Secrets Manager. Era o primeiro teste real da aplicação com o banco na nuvem.
 - A numeração do `AUTO_INCREMENT` no RDS segue em 9, como no banco local.
 - Lembretes: o IP muda a cada tarefa; os dados agora ficam no RDS e sobrevivem à troca de tarefa; o RDS parado derruba a aplicação ao subir. Ao terminar, *Desired tasks* = 0 e parar o RDS.
+- **Ambiente desligado em 2026-11-02:** Service em Desired tasks = 0 (conferido pela CLI) e RDS `Stopped temporarily` (confirmado pelo usuário no console). O RDS religa sozinho em 7 dias.
 
 ## Próximos passos
 
 - Continuar o playbook: o usuário cola o próximo passo (a numeração do playbook é diferente da nossa).
 - ~~Segunda release (com o banco)~~ (feita, passo 25).
 - Seções 12 a 14 do tutorial da AWS (rotina, problemas comuns, limpeza).
-- Desligar o ambiente da AWS quando terminar (Desired tasks = 0 e parar o RDS); decidir se apaga a branch `teste-ci-quebrado`.
+- Ambiente da AWS desligado em 2026-11-02 (Desired tasks = 0 e RDS Stopped temporarily). O RDS parado religa sozinho em 7 dias (por volta de 2026-11-09). Decidir se apaga a branch `teste-ci-quebrado`.
 - Decidir sobre as sobras na AWS (`rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos`).

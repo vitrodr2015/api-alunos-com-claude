@@ -409,7 +409,8 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 
 ## Próximos passos
 
-- Próximo passo do playbook (a partir do 25).
+- Continuar o playbook: o usuário cola o próximo passo (a numeração do playbook é diferente da nossa).
 - ~~Segunda release (com o banco)~~ (feita, passo 25).
-- Seções 12 a 14 do tutorial (rotina, problemas comuns, limpeza).
+- Seções 12 a 14 do tutorial da AWS (rotina, problemas comuns, limpeza).
+- Desligar o ambiente da AWS quando terminar (Desired tasks = 0 e parar o RDS); decidir se apaga a branch `teste-ci-quebrado`.
 - Decidir sobre as sobras na AWS (`rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos`).

@@ -510,6 +510,27 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
   - O Spring Security cria sozinho um usuário `user` com senha gerada, anunciada no log na subida (`Using generated security password`). É o comportamento padrão, e será substituído pelo `UserDetailsService` do passo 29 do playbook; a senha gerada não foi usada nem registrada.
 - **Efeito na AWS (ainda não executado, só para planejar):** quando a segurança for para uma release, a API pública deixa de responder sem token; o Postman e o teste pelo IP vão precisar de login; e o `JWT_SECRET` (passo 31, sem valor padrão) exige **um segredo novo no Secrets Manager, uma variável nova na Task Definition e permissão de leitura dele na role de execução**. Sem isso, a tarefa não sobe e o deploy trava. Isso entra no `Duvida-CICD.md` quando for executado.
 
+## 31. Segurança, parte 2: usuário e permissões (passo 29 do playbook)
+
+- **Status:** concluído na branch `feature/seguranca` (ainda sem PR: o build segue vermelho até o passo 33 do playbook)
+- **Migration `V4__create_tables_users_and_permissions.sql`** (a `V3` já está na produção, então a próxima é a `V4`):
+  - `permission` (`id`, `description` única);
+  - `users` (`id`, `user_name` única, `full_name`, `password`, `account_non_expired`, `account_non_locked`, `credentials_non_expired`, `enabled`). O nome é `users`, no plural, porque `user` é palavra reservada em vários bancos;
+  - `user_permission` (tabela de ligação, chave primária composta `id_user` + `id_permission`, duas chaves estrangeiras; apagar o usuário apaga as ligações dele, mas uma permissão em uso não pode ser apagada).
+  - A collation `utf8mb4_unicode_ci` não diferencia maiúsculas de minúsculas, então `Admin` e `admin` são o mesmo `user_name` no MySQL (no H2 dos testes diferenciaria).
+- **Entidades** (no pacote `model`, com os nomes de coluna explícitos):
+  - `Permission implements GrantedAuthority`: `getAuthority()` devolve a `description`;
+  - `User implements UserDetails`: os quatro `is...()` vêm das colunas booleanas, `getUsername()` devolve `userName`, `getAuthorities()` devolve as permissões; `@ManyToMany(fetch = EAGER)` com `@JoinTable(name = "user_permission", joinColumns = id_user, inverseJoinColumns = id_permission)`. EAGER porque o Spring Security usa as permissões fora de uma transação. A coluna `password` guarda **só o hash** (passo 30 do playbook); por ora não há usuário nem senha semeados.
+  - Implementam `Serializable` (via `UserDetails` e `GrantedAuthority`), por isso têm `serialVersionUID`.
+- **`UserRepository.findByUserName`** devolve `Optional<User>` (o playbook deixa livre; o `Optional` evita o `null`). **`UserService implements UserDetailsService`**: `loadUserByUsername` lança `UsernameNotFoundException("Usuário não encontrado")` sem repetir o nome digitado. Como esse bean existe, o Spring Boot **deixa de criar o usuário padrão com senha gerada**: a linha `Using generated security password` do log do passo 30 sumiu (0 ocorrências).
+- **Testes novos (7):**
+  - `UserServiceTests` (Mockito, 2): devolve o usuário encontrado; lança `UsernameNotFoundException` quando não existe;
+  - `UserDetailsLoadingTests` (5, integração): carrega usuário e permissões pelo nome, usuário sem permissões, as quatro flags de conta preservadas (desativada, bloqueada, expirada), nome inexistente e que o bean é o `UserService`. Cada teste grava com `EntityManager`, dá `flush()` + `clear()` (esvazia o cache do Hibernate, para a leitura passar de verdade pelo SQL) e a transação é desfeita no fim, **sem deixar linhas no banco**.
+- **A prova que importa foi no MySQL, não no H2** (o H2 cria o schema a partir das entidades e não exercita a migration): rodei o mesmo `UserDetailsLoadingTests` contra o `mysql-dev` passando por linha de comando `-Dspring.datasource.url=...`, `-Dspring.flyway.enabled=true`, `-Dspring.jpa.hibernate.ddl-auto=validate` e `-Dspring.sql.init.mode=never`. O Flyway aplicou a `V4`, o Hibernate **validou as entidades contra as tabelas reais** e os 5 testes passaram lendo do MySQL; depois `users`, `permission` e `user_permission` ficaram com 0 linhas. Esse é o "pronto quando" do passo.
+- **Placar da suíte:** 95 testes, 59 falhas (as mesmas do passo anterior, por causa da segurança; os 7 novos passam). Aplicação sobe no MySQL e a rota segue dando 401 sem credenciais.
+- **Para a AWS:** a próxima release que levar isso fará o Flyway criar as três tabelas no RDS (vazias). Nada a fazer no console por causa da `V4`.
+- **Ainda não feito:** `permissions` só tem getter/setter de lista; não há `getRoles()` (entra com o JWT, passo 31 do playbook), nem endpoint de cadastro de usuário, nem usuário semeado.
+
 ## Próximos passos
 
 - Continuar o playbook: o usuário cola o próximo passo (a numeração do playbook é diferente da nossa).

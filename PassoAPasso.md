@@ -393,9 +393,23 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Limite (lembrete do playbook):** como o Flyway fica desligado nos testes, as migrations **não são exercitadas** por eles. Cada migration nova precisa ser validada subindo a aplicação contra o MySQL local (passo 17), como fizemos com a `V1` e a `V2`. A conferência automática com MySQL real é o Passo 39 do playbook.
 - Correção de uma anotação minha: no passo 22 eu disse que um teste de repositório entraria no Passo 24; não é o caso. O Passo 24 é este (dados de teste e Flyway desligado).
 
+## 25. Release 1.1.0: a aplicação usa o MySQL na AWS
+
+- **Status:** concluído (2026-11-02); deploy `success`, aplicação respondendo na AWS lendo do RDS
+- Ciclo, como foi feito:
+  1. `release/1.1.0` criada a partir da `develop` (12 commits, 17 arquivos: passos 17 a 24).
+  2. PR #16 `release/1.1.0` → `main`, com o `build` verde (68 testes). Antes do merge o usuário confirmou o RDS `Available` e o Service com *Desired tasks* = 1.
+  3. Merge com *merge commit* (`dd7d051`) → a esteira rodou e o deploy terminou com `success`.
+  4. Tag anotada `v1.1.0` em `dd7d051`.
+  5. PR #17 `main` → `develop` (merge commit `e9cd5ed`), para a `develop` receber a release.
+- **Conferido na AWS** (pela AWS CLI, perfil `crud-alunos`): Service `ACTIVE`, 1 tarefa `RUNNING`, deploy `COMPLETED`, Task Definition **`crud-alunos-task-definition:6`**. (Eu havia previsto a `:3`; a numeração é maior porque cada deploy da `main` registra uma revisão nova.)
+- **Teste da API na AWS** (IP público da tarefa, porta 8080): `GET /alunos` devolveu 8 alunos (`totalElements` 8); `GET /alunos/8` devolveu Helena Barros; id inexistente deu 404. Ou seja, o Flyway rodou no RDS (tabela `aluno` e `V2`) e a aplicação conectou com a senha do Secrets Manager. Era o primeiro teste real da aplicação com o banco na nuvem.
+- A numeração do `AUTO_INCREMENT` no RDS segue em 9, como no banco local.
+- Lembretes: o IP muda a cada tarefa; os dados agora ficam no RDS e sobrevivem à troca de tarefa; o RDS parado derruba a aplicação ao subir. Ao terminar, *Desired tasks* = 0 e parar o RDS.
+
 ## Próximos passos
 
 - Próximo passo do playbook (a partir do 25).
-- Segunda release (com o banco): RDS `Available` antes do merge na `main`; o Flyway cria a tabela no RDS.
+- ~~Segunda release (com o banco)~~ (feita, passo 25).
 - Seções 12 a 14 do tutorial (rotina, problemas comuns, limpeza).
 - Decidir sobre as sobras na AWS (`rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos`).

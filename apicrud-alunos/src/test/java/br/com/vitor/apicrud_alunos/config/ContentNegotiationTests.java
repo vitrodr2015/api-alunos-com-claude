@@ -23,7 +23,9 @@ import org.springframework.test.web.servlet.MockMvc;
 // XML e YAML continuam valendo nos demais endpoints. O PATCH /alunos/1/enable é idempotente
 // (a Ana Souza já é ativa) e devolve um AlunoResponse comum, então serve para provar os três formatos.
 @SpringBootTest
-@AutoConfigureMockMvc
+// Teste de contrato: os filtros de segurança ficam DESLIGADOS (addFilters = false), então este teste NÃO exercita a segurança.
+// O 401 e o 403 são testados à parte, com os filtros ligados, em security/SecurityFilterChainTests.
+@AutoConfigureMockMvc(addFilters = false)
 class ContentNegotiationTests {
 
 	@Autowired

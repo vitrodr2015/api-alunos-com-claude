@@ -531,6 +531,19 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Para a AWS:** a próxima release que levar isso fará o Flyway criar as três tabelas no RDS (vazias). Nada a fazer no console por causa da `V4`.
 - **Ainda não feito:** `permissions` só tem getter/setter de lista; não há `getRoles()` (entra com o JWT, passo 31 do playbook), nem endpoint de cadastro de usuário, nem usuário semeado.
 
+## 32. Segurança, parte 3: hash de senha (passo 30 do playbook)
+
+- **Status:** concluído na branch `feature/seguranca` (ainda sem PR: build vermelho até o passo 33 do playbook)
+- **Decisão:** `config/PasswordConfig` expõe um `PasswordEncoder` que é um **`DelegatingPasswordEncoder` com só o BCrypt cadastrado** (padrão `bcrypt`). O playbook deixa a escolha entre BCrypt puro e o encoder delegante; escolhi o delegante porque o hash sai com o algoritmo no começo (`{bcrypt}$2a$10$...`), então dá para trocar o algoritmo padrão no futuro **sem invalidar as senhas antigas** (elas continuam sendo conferidas pelo prefixo). Não usei `PasswordEncoderFactories.createDelegatingPasswordEncoder()` de propósito: esse encoder padrão também aceita `{noop}` (senha em texto puro), `md5`, `sha` e outros inseguros; aqui um hash sem prefixo, ou com prefixo não cadastrado, é **recusado com erro** (`IllegalArgumentException`). O PBKDF2 do projeto de referência não foi usado (só faria sentido por compatibilidade com hashes já existentes).
+- **O hash ocupa 68 caracteres** (`{bcrypt}` 8 + os 60 do BCrypt), bem dentro da coluna `users.password` (255).
+- **Limite do BCrypt, descoberto rodando (não suposto):** nesta versão do Spring Security (7.1.2), uma senha com **mais de 72 bytes é recusada ao codificar** com `IllegalArgumentException: password cannot be more than 72 bytes`; não é truncada em silêncio (senha de exatamente 72 bytes funciona e o último caractere conta). Um futuro endpoint de cadastro precisa validar o tamanho e responder 400, senão vira 500. Está em teste permanente.
+- **Testes novos (11):**
+  - `PasswordConfigTests` (7, sem Spring): o hash não é a senha e começa com `{bcrypt}$2`; a mesma senha gera hashes diferentes (salt); certa confere e errada, ou com caixa diferente, não; hash sem prefixo, `{noop}` e `{md5}` dão erro; hash antigo com prefixo cadastrado continua valendo; senha de 72 bytes funciona; senha de 73 bytes é recusada;
+  - `PasswordHashingIntegrationTests` (4, integração): o bean usa o prefixo `{bcrypt}`; **o banco guarda o hash e nunca a senha** (lido com SQL nativo `select password from users`); um `DaoAuthenticationProvider` autentica com a senha certa contra o hash vindo do banco e dá `BadCredentialsException` com a errada. Cada teste roda numa transação desfeita, sem deixar linhas.
+- **Verificado no MySQL local:** o mesmo `PasswordHashingIntegrationTests` rodado contra o `mysql-dev` (mesmos `-D` do passo anterior: Flyway ligado e `ddl-auto: validate`) passou; `users` ficou com 0 linhas.
+- **Placar da suíte:** 106 testes, 59 falhas (as mesmas da segurança). Os 18 testes novos de segurança (passos 29 e 30) passam.
+- **O alerta do playbook sobre usuário semeado em migration:** **ainda não semeei nenhum usuário.** Quando o login (passo 32 do playbook) precisar de um, a decisão será tomada ali. Como o repositório é público, um hash de senha fraca ficaria exposto: se houver seed, a senha de estudo deve ser forte e não ficar escrita em arquivo versionado.
+
 ## Próximos passos
 
 - Continuar o playbook: o usuário cola o próximo passo (a numeração do playbook é diferente da nossa).

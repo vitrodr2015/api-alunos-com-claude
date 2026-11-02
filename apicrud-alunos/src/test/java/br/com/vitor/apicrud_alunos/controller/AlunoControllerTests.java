@@ -23,7 +23,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.jayway.jsonpath.JsonPath;
 
 @SpringBootTest
-@AutoConfigureMockMvc
+// Teste de contrato: os filtros de segurança ficam DESLIGADOS (addFilters = false), então este teste NÃO exercita a segurança.
+// O 401 e o 403 são testados à parte, com os filtros ligados, em security/SecurityFilterChainTests.
+@AutoConfigureMockMvc(addFilters = false)
 class AlunoControllerTests {
 
 	@Autowired

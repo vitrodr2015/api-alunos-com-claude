@@ -25,6 +25,8 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import br.com.vitor.apicrud_alunos.security.InvalidTokenException;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
@@ -45,6 +47,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	public ResponseEntity<ErrorResponse> handlePropertyReference(PropertyReferenceException ex) {
 		return build(HttpStatus.BAD_REQUEST,
 				"Não é possível ordenar por '" + ex.getPropertyName() + "': esse campo não existe");
+	}
+
+	// token vencido, adulterado, de outro emissor, do tipo errado, ou de usuário que não pode mais entrar
+	@ExceptionHandler(InvalidTokenException.class)
+	public ResponseEntity<ErrorResponse> handleInvalidToken(InvalidTokenException ex) {
+		return build(HttpStatus.UNAUTHORIZED, ex.getMessage());
 	}
 
 	@ExceptionHandler(ConflictException.class)
@@ -103,6 +111,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	private String descricao(HttpStatus status) {
 		return switch (status) {
 			case BAD_REQUEST -> "Requisição inválida";
+			case UNAUTHORIZED -> "Não autenticado";
 			case NOT_FOUND -> "Não encontrado";
 			case METHOD_NOT_ALLOWED -> "Método não permitido";
 			case NOT_ACCEPTABLE -> "Formato não aceito";

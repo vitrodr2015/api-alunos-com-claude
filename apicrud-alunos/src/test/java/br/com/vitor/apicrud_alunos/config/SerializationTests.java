@@ -17,7 +17,9 @@ import org.springframework.test.web.servlet.MockMvc;
 // A ordem dos campos do AlunoResponse vale em JSON, XML e YAML (nos endpoints que não são HAL, testados pelo
 // PATCH /alunos/1/enable, idempotente) e também dentro do HAL do GET (_links primeiro, depois os campos).
 @SpringBootTest
-@AutoConfigureMockMvc
+// Teste de contrato: os filtros de segurança ficam DESLIGADOS (addFilters = false), então este teste NÃO exercita a segurança.
+// O 401 e o 403 são testados à parte, com os filtros ligados, em security/SecurityFilterChainTests.
+@AutoConfigureMockMvc(addFilters = false)
 class SerializationTests {
 
 	private static final String DATA_HORA = "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z";

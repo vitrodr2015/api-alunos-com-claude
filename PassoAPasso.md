@@ -95,7 +95,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - Ordem de validação: corpo (400), id (400), existência (404), conflito (409), alteração.
 - Erros sempre no formato `ErrorResponse` (passo 4).
 - Fora do contrato por enquanto: `PATCH` parcial genérico em `/alunos/{id}`.
-- **Atualizado no passo 26:** os limites de paginação deste contrato (`size` padrão 10, faixa de 1 a 100, 400 fora dela) mudaram; a regra vigente está no passo 26.
+- **Atualizado nos passos 26 e 28:** os limites de paginação deste contrato (`size` padrão 10, faixa de 1 a 100, 400 fora dela) mudaram (passo 26) e a listagem e o `GET` por id passaram a responder em HAL (passo 28); a regra vigente está nesses passos.
 
 ## 6. Implementação dos 7 endpoints
 
@@ -445,6 +445,40 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Bateria completa depois da paginação** (2026-11-02, MySQL local, por curl): 28 verificações, todas conforme o contrato, e o banco terminou com os mesmos 408 alunos. Cobriu: `GET` lista, por id, inexistente (404), id `0` e `abc` (400); `POST` 201 com `Location`, e-mail repetido com outra caixa (409), campos inválidos, data futura e corpo ilegível (400), `Content-Type` não aceito (415); `PUT` 200, e-mail de outro aluno (409) e inexistente (404); `PATCH disable`/`enable` (idempotentes, 404 se não existe); `DELETE` 204 e depois 404, id inválido (400); método não permitido (405) e `Accept` inexistente (406); formatos JSON, XML e YAML; `sort` inexistente e `ativo=talvez` (400) e `size=500` (200, reduzido). O aluno criado na bateria (id 410) foi apagado pela própria rota, então o próximo id local será 411.
 - **Não executado:** a coleção do Postman em si (só foi validada como JSON e teve o item do `size=101` ajustado); a bateria acima foi por curl.
 - **Atenção ao levar para a AWS:** a `V3` é uma migration como qualquer outra. Na **próxima release**, o Flyway vai aplicá-la no RDS e inserir os 400 alunos lá também. Em projeto real, dados de exemplo não vão para produção; aqui é aceitável por ser estudo, mas é uma decisão a tomar **antes** de fazer a release: depois de aplicada, a `V3` não pode ser editada (só desfeita por uma `V4` que apague as linhas).
+
+## 28. HATEOAS (passo 26 do playbook, opcional)
+
+- **Status:** concluído (branch `feature/hateoas`). Escolha do usuário: opção 1, HAL só na **listagem** e no **`GET /alunos/{id}`**; os demais endpoints não mudam.
+- **Dependência:** `spring-boot-starter-hateoas` (Spring HATEOAS 3.1.3, gerenciado pelo Boot 4.1.2). Funciona com o Jackson 3 do Boot 4; confirmei rodando, não só pela documentação.
+- **Como ficou:**
+  - `AlunoResponse` ganhou `@Relation(collectionRelation = "alunos", itemRelation = "aluno")`, para a lista sair em `_embedded.alunos` (sem isso o nome seria `alunoResponseList`).
+  - `assembler/AlunoModelAssembler implements RepresentationModelAssembler<AlunoResponse, EntityModel<AlunoResponse>>`: cada aluno recebe `self`, `alunos` (a coleção) e **só a ação que faz sentido**: `disable` se está ativo, `enable` se está inativo.
+  - `AlunoController.listar` devolve `PagedModel<EntityModel<AlunoResponse>>` via `PagedResourcesAssembler` (gera `first`, `prev`, `self`, `next`, `last` e o bloco `page`); `buscar` devolve `EntityModel<AlunoResponse>`. O service passou a devolver `Page<Aluno>` e o `PageResponse` (o record do passo 10) foi **apagado**, porque o `Page` do Spring Data + o `PagedModel` o substituem.
+  - Os dois `GET` declaram `produces = {application/hal+json, application/json}`.
+- **Formato novo da listagem:**
+  ```json
+  { "_embedded": { "alunos": [ { "_links": { "self": {...}, "alunos": {...}, "disable": {...} }, "id": 1, "ativo": true, "email": "...", "nome": "...", "dataNascimento": "..." } ] },
+    "_links": { "first": {...}, "prev": {...}, "self": {...}, "next": {...}, "last": {...} },
+    "page": { "number": 0, "size": 20, "totalElements": 408, "totalPages": 21 } }
+  ```
+  Os links da página **preservam os filtros** (`nome`, `ativo`) e o tamanho. Lista vazia vem **sem `_embedded`** (só `_links.self` e `page`). Primeira página não tem `prev`; última não tem `next`. Os campos de cada aluno continuam na ordem do passo 10, com `_links` na frente.
+- **O contrato mudou de novo:**
+
+  | Antes (passos 5 a 10) | Agora |
+  | --- | --- |
+  | `content`, `page`, `size`, `totalElements`, `totalPages` na raiz | `_embedded.alunos`, `_links` e `page{number,size,totalElements,totalPages}` |
+  | `GET` lista e por id em JSON, XML ou YAML | em **HAL (JSON)**; `Accept` de XML/YAML → **406** (erro em JSON). Sem `Accept` ou `*/*` → JSON (HAL) |
+  | `POST`, `PUT`, `PATCH`, `DELETE` | **sem mudança** (JSON, XML e YAML, sem `_links`) |
+  | erros | sem mudança (sempre JSON) |
+- **Tropeços** (para o playbook):
+  1. **500 em toda listagem** na primeira subida: `methodOn(AlunoController.class).desativar(...)` faz o Spring HATEOAS criar um *proxy do tipo de retorno* do método, e `AlunoResponse` é um `record` (final): `Cannot subclass final class`. O `buscar` funcionou porque devolve `EntityModel`. Solução: os links `disable`/`enable` são montados com `linkTo(AlunoController.class).slash(id)` mais o texto do caminho.
+  2. **`test-compile` passou com erro de verdade escondido:** depois de apagar o `PageResponse`, sobrou o `.class` antigo em `target/` e a compilação incremental não reclamou. Só `./mvnw clean test-compile` mostrou os erros. Ao apagar uma classe, rode com `clean`.
+  3. **Um `sed` quebrou o `pom.xml`** (inseriu o XML com `\t` literais, `Non-parseable POM`). Voltei o arquivo com `git checkout` e refiz pelo editor. Para editar XML, não use `sed` com escapes de tabulação.
+  4. **`MockMvc` e os links:** os links da página nascem da URL da requisição, e o `MockMvc` não coloca `.param(...)` na query string. Nos testes de links com filtro a query vai na própria URL (`get("/alunos?nome=adriana&ativo=true&size=2")`). No `curl` real os filtros apareceram normalmente nos links.
+- **Testes:** 88 passando (inclusive em ordem aleatória de classes). Reescritos `ContentNegotiationTests` e `SerializationTests`: XML e YAML passam a ser provados pelo `PATCH /alunos/1/enable` (idempotente, devolve um `AlunoResponse` comum); novos testes provam o HAL, o 406 de XML/YAML nos dois `GET`, `application/hal+json`, links de página, links `disable`/`enable` por estado, filtros nos links e que as escritas não trazem `_links`. Os 30 testes do service e do controller de listagem trocaram `$.content` por `$._embedded.alunos`, e `$.page`/`$.size`/`$.totalElements` por `$.page.*`.
+- **Verificado no MySQL local** (2026-11-02): bateria completa por `curl` (30 verificações, 0 divergências), incluindo seguir os links `next` de uma página para outra, `disable` virando `enable` depois do `PATCH`, 406 em XML/YAML nos `GET`, e `PATCH` ainda respondendo em XML e YAML.
+- **Postman:** os scripts da listagem passaram a esperar `_embedded`, `_links` e `page` (e `page.size` no item do `size=101`); a descrição do item de listagem menciona o HAL. JSON da coleção válido; a coleção em si não foi executada no Postman.
+- **Ainda não está na produção:** a API da AWS (release 1.1.0) continua no contrato antigo.
 
 ## Próximos passos
 

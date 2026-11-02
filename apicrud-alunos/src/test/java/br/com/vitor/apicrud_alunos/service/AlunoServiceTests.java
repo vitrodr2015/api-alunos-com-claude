@@ -26,7 +26,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
-import br.com.vitor.apicrud_alunos.dto.PageResponse;
 import br.com.vitor.apicrud_alunos.exception.ConflictException;
 import br.com.vitor.apicrud_alunos.exception.InvalidRequestException;
 import br.com.vitor.apicrud_alunos.exception.ResourceNotFoundException;
@@ -205,7 +204,7 @@ class AlunoServiceTests {
 		Page<Aluno> pagina = new PageImpl<>(List.of(aluno(1L, "Ana", "a@x.com")), PageRequest.of(1, 5), 11);
 		when(repository.findByNomeContainingIgnoreCase(eq("souza"), any(Pageable.class))).thenReturn(pagina);
 
-		PageResponse<Aluno> resposta = service.listar("  souza ", null, PageRequest.of(1, 5, Sort.by(Sort.Direction.DESC, "nome")));
+		Page<Aluno> resposta = service.listar("  souza ", null, PageRequest.of(1, 5, Sort.by(Sort.Direction.DESC, "nome")));
 
 		ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
 		verify(repository).findByNomeContainingIgnoreCase(eq("souza"), pageable.capture());
@@ -217,10 +216,10 @@ class AlunoServiceTests {
 		assertThat(ordens.get(0).getProperty()).isEqualTo("nome");
 		assertThat(ordens.get(0).getDirection()).isEqualTo(Sort.Direction.DESC);
 		assertThat(ordens.get(1).getProperty()).isEqualTo("id");
-		assertThat(resposta.totalElements()).isEqualTo(11);
-		assertThat(resposta.totalPages()).isEqualTo(3);
-		assertThat(resposta.page()).isEqualTo(1);
-		assertThat(resposta.size()).isEqualTo(5);
+		assertThat(resposta.getTotalElements()).isEqualTo(11);
+		assertThat(resposta.getTotalPages()).isEqualTo(3);
+		assertThat(resposta.getNumber()).isEqualTo(1);
+		assertThat(resposta.getSize()).isEqualTo(5);
 	}
 
 	@Test
@@ -228,9 +227,9 @@ class AlunoServiceTests {
 		when(repository.findByNomeContainingIgnoreCaseAndAtivo(eq(""), eq(false), any(Pageable.class)))
 				.thenReturn(Page.empty());
 
-		PageResponse<Aluno> resposta = service.listar(null, false, PageRequest.of(0, 20));
+		Page<Aluno> resposta = service.listar(null, false, PageRequest.of(0, 20));
 
-		assertThat(resposta.content()).isEmpty();
+		assertThat(resposta.getContent()).isEmpty();
 		verify(repository, never()).findByNomeContainingIgnoreCase(any(), any());
 	}
 

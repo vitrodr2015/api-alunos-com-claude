@@ -279,7 +279,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
   5. Tag anotada `v1.0.0` no commit `7e10a2f`.
   6. PR #6 `main` → `develop`, para a `develop` receber o merge commit da release.
 - A `release/1.0.0` foi usada como acumulador (ideia do usuário): o PR #5 ficou aberto enquanto mais PRs podiam entrar na release, e o deploy só aconteceu no merge. No Git Flow clássico a release só recebe correções e as features novas esperam a próxima; fica como segundo exercício.
-- Pendente: apagar no GitHub as branches já mescladas (`release/1.0.0`, `feature/ci-gitflow`, `feature/aluno-8`, `ci-permissions`, `teste-ci-quebrado`). O sistema bloqueou `git push origin --delete`, então é pelo botão **Delete branch**.
+- As branches já mescladas foram apagadas do GitHub em 2026-11-02 (15 branches, pela API `gh api -X DELETE .../git/refs/heads/<nome>`, a pedido do usuário). Ficaram `main`, `develop` e `teste-ci-quebrado` (nunca mesclada, de propósito). As tags `v1.0.0` e `v1.1.0` continuam.
 
 ## 17. Banco de dados local (MySQL em Docker)
 

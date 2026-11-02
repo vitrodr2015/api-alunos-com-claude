@@ -3,6 +3,7 @@ package br.com.vitor.apicrud_alunos.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -21,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
@@ -199,21 +201,21 @@ class AlunoServiceTests {
 	// ---------- listar ----------
 
 	@Test
-	void listarMontaAPaginaEOrdenaPorNomeSemDiferenciarCaixaComDesempatePeloId() {
-		Page<Aluno> pagina = new PageImpl<>(List.of(aluno(1L, "Ana", "a@x.com")), org.springframework.data.domain.PageRequest.of(1, 5), 11);
-		when(repository.buscar(eq("souza"), eq(true), any(Pageable.class))).thenReturn(pagina);
+	void listarSemAtivoUsaOFiltroSoPorNomeEPassaPaginaEOrdenacaoComDesempatePeloId() {
+		Page<Aluno> pagina = new PageImpl<>(List.of(aluno(1L, "Ana", "a@x.com")), PageRequest.of(1, 5), 11);
+		when(repository.findByNomeContainingIgnoreCase(eq("souza"), any(Pageable.class))).thenReturn(pagina);
 
-		PageResponse<Aluno> resposta = service.listar("  souza ", true, 1, 5, "nome,desc");
+		PageResponse<Aluno> resposta = service.listar("  souza ", null, PageRequest.of(1, 5, Sort.by(Sort.Direction.DESC, "nome")));
 
 		ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-		verify(repository).buscar(eq("souza"), eq(true), pageable.capture());
+		verify(repository).findByNomeContainingIgnoreCase(eq("souza"), pageable.capture());
+		verify(repository, never()).findByNomeContainingIgnoreCaseAndAtivo(any(), anyBoolean(), any());
 		assertThat(pageable.getValue().getPageNumber()).isEqualTo(1);
 		assertThat(pageable.getValue().getPageSize()).isEqualTo(5);
 		List<Sort.Order> ordens = pageable.getValue().getSort().toList();
 		assertThat(ordens).hasSize(2);
 		assertThat(ordens.get(0).getProperty()).isEqualTo("nome");
 		assertThat(ordens.get(0).getDirection()).isEqualTo(Sort.Direction.DESC);
-		assertThat(ordens.get(0).isIgnoreCase()).isTrue();
 		assertThat(ordens.get(1).getProperty()).isEqualTo("id");
 		assertThat(resposta.totalElements()).isEqualTo(11);
 		assertThat(resposta.totalPages()).isEqualTo(3);
@@ -222,31 +224,39 @@ class AlunoServiceTests {
 	}
 
 	@Test
-	void listarSemFiltrosUsaNomeVazioEAtivoNulo() {
-		when(repository.buscar(eq(""), eq(null), any(Pageable.class))).thenReturn(Page.empty());
+	void listarComAtivoUsaOFiltroPorNomeEAtivo() {
+		when(repository.findByNomeContainingIgnoreCaseAndAtivo(eq(""), eq(false), any(Pageable.class)))
+				.thenReturn(Page.empty());
 
-		PageResponse<Aluno> resposta = service.listar(null, null, 0, 10, "id");
+		PageResponse<Aluno> resposta = service.listar(null, false, PageRequest.of(0, 20));
 
 		assertThat(resposta.content()).isEmpty();
-		ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-		verify(repository).buscar(eq(""), eq(null), pageable.capture());
-		assertThat(pageable.getValue().getSort().toList()).hasSize(1);
+		verify(repository, never()).findByNomeContainingIgnoreCase(any(), any());
 	}
 
 	@Test
-	void listarComParametrosInvalidosLancaRequisicaoInvalida() {
-		assertThatThrownBy(() -> service.listar(null, null, -1, 10, "id"))
-				.isInstanceOf(InvalidRequestException.class);
-		assertThatThrownBy(() -> service.listar(null, null, 0, 0, "id"))
-				.isInstanceOf(InvalidRequestException.class);
-		assertThatThrownBy(() -> service.listar(null, null, 0, 101, "id"))
-				.isInstanceOf(InvalidRequestException.class);
-		assertThatThrownBy(() -> service.listar(null, null, 0, 10, "senha"))
-				.isInstanceOf(InvalidRequestException.class)
-				.hasMessageContaining("Campos aceitos: dataNascimento, email, id, nome");
-		assertThatThrownBy(() -> service.listar(null, null, 0, 10, "nome,sideways"))
-				.isInstanceOf(InvalidRequestException.class);
-		verify(repository, never()).buscar(any(), any(), any());
+	void listarSemOrdenacaoOrdenaPeloId() {
+		when(repository.findByNomeContainingIgnoreCase(eq(""), any(Pageable.class))).thenReturn(Page.empty());
+
+		service.listar(null, null, PageRequest.of(0, 20));
+
+		ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+		verify(repository).findByNomeContainingIgnoreCase(eq(""), pageable.capture());
+		assertThat(pageable.getValue().getSort().toList()).hasSize(1);
+		assertThat(pageable.getValue().getSort().getOrderFor("id")).isNotNull();
+	}
+
+	@Test
+	void listarOrdenandoPeloIdNaoDuplicaOId() {
+		when(repository.findByNomeContainingIgnoreCase(eq(""), any(Pageable.class))).thenReturn(Page.empty());
+
+		service.listar(null, null, PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "id")));
+
+		ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+		verify(repository).findByNomeContainingIgnoreCase(eq(""), pageable.capture());
+		List<Sort.Order> ordens = pageable.getValue().getSort().toList();
+		assertThat(ordens).hasSize(1);
+		assertThat(ordens.get(0).getDirection()).isEqualTo(Sort.Direction.DESC);
 	}
 
 }

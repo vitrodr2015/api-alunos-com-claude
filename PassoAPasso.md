@@ -95,6 +95,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - Ordem de validação: corpo (400), id (400), existência (404), conflito (409), alteração.
 - Erros sempre no formato `ErrorResponse` (passo 4).
 - Fora do contrato por enquanto: `PATCH` parcial genérico em `/alunos/{id}`.
+- **Atualizado no passo 26:** os limites de paginação deste contrato (`size` padrão 10, faixa de 1 a 100, 400 fora dela) mudaram; a regra vigente está no passo 26.
 
 ## 6. Implementação dos 7 endpoints
 
@@ -407,6 +408,29 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - A numeração do `AUTO_INCREMENT` no RDS segue em 9, como no banco local.
 - Lembretes: o IP muda a cada tarefa; os dados agora ficam no RDS e sobrevivem à troca de tarefa; o RDS parado derruba a aplicação ao subir. Ao terminar, *Desired tasks* = 0 e parar o RDS.
 - **Ambiente desligado em 2026-11-02:** Service em Desired tasks = 0 (conferido pela CLI) e RDS `Stopped temporarily` (confirmado pelo usuário no console). O RDS religa sozinho em 7 dias.
+
+## 26. Paginação com `Pageable` (passo 25 do playbook)
+
+- **Status:** concluído (branch `feature/paginacao`)
+- **O que mudou:** a listagem deixou de ler `page`, `size` e `sort` como parâmetros próprios com validação à mão e passou a receber um `Pageable`, que o Spring resolve. O controller só recebe `Pageable pageable`; o `AlunoService.listar(nome, ativo, pageable)` escolhe a consulta e acrescenta o `id` como desempate (e como ordem padrão), para a paginação ser estável entre páginas.
+- **Limites no `application.yml`:** `spring.data.web.pageable.default-page-size: 20` e `max-page-size: 50`. O `application.yml` **de teste substitui o principal**, então os mesmos dois valores foram repetidos nele (o playbook já avisa desse cuidado).
+- **Repository:** as consultas passaram a ser derivadas, `findByNomeContainingIgnoreCase` e `findByNomeContainingIgnoreCaseAndAtivo` (o `@Query` com `locate` do passo 23 saiu). O Spring Data já escapa `%` e `_`, então `nome=%` procura o texto `%` e não vira curinga.
+- **Ordenação inválida = 400:** `GlobalExceptionHandler` trata `PropertyReferenceException` e devolve o `ErrorResponse` com 400, ex.: `Não é possível ordenar por 'senha': esse campo não existe`. **Diferença de versão:** no Spring Data 4 (Boot 4) a classe é `org.springframework.data.core.PropertyReferenceException`; o pacote antigo `org.springframework.data.mapping` não existe mais e quebra o contexto inteiro (`NoClassDefFoundError`). No meu primeiro `mvn test` eu filtrei a saída e deixei passar o erro de compilação; só a leitura do relatório do surefire mostrou a causa.
+- **O contrato do passo 5 mudou (decisão do playbook):**
+
+  | Antes (contrato do passo 5) | Agora |
+  | --- | --- |
+  | `size` padrão 10; faixa de 1 a 100 | `size` padrão **20**; máximo **50** |
+  | `size` acima de 100 → 400 | `size` acima de 50 → **reduzido para 50** (200) |
+  | `page=-1`, `size=0`, `page=abc` → 400 | caem nos padrões do Spring: `page` 0 e `size` 20 (200) |
+  | `sort` só por `id`, `nome`, `email`, `dataNascimento` | `sort` por **qualquer campo** do aluno (inclui `ativo`); campo inexistente → 400 |
+  | `nome` e `email` ordenavam sem diferenciar maiúsculas de minúsculas à força | segue a collation do banco (no MySQL `utf8mb4_unicode_ci` já ignora a caixa; no H2 dos testes não) |
+
+  O `size` devolvido na resposta é o **efetivo** (já reduzido).
+- **Testes:** 74 passando. No service (Mockito) saíram os testes de validação de página e entraram os de escolha da consulta e do desempate pelo `id`. No controller, o teste "parâmetros inválidos → 400" foi dividido: ordenação por campo inexistente → 400, filtro `ativo=talvez` → 400, e novos para padrão 20, `size=500` → 50, `page`/`size` fora da faixa → padrões e ordenação por `dataNascimento,desc` e por `ativo`.
+- **Verificado no MySQL local** (2026-11-02): sem parâmetros → `page` 0, `size` 20; `size=500` → 50; `size=3&page=2&sort=nome,desc` → página certa; `sort=senha` → 400 com a mensagem acima; `page=-1`, `size=0` e `page=abc` → 200 nos padrões; `nome=SOUZA` → 1; `nome=%` → 0.
+- **Postman:** o item "400 - Listar com size 101" esperava 400 e passaria a falhar; virou "200 - Listar com size 101 (não é erro: é reduzido para 50)" e confere `size` = 50. Ele continua na pasta "2 - Erros esperados", só com o nome avisando. A descrição do item de listagem foi atualizada. A coleção continua JSON válido.
+- **Ainda não está na produção:** a mudança de contrato só chega à AWS na próxima release (a API da 1.1.0 continua com o contrato antigo).
 
 ## Próximos passos
 

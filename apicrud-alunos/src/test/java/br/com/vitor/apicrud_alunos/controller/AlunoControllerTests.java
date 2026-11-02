@@ -205,15 +205,52 @@ class AlunoControllerTests {
 	}
 
 	@Test
-	void listarComParametrosInvalidosRetorna400() throws Exception {
+	void listarOrdenandoPorCampoInexistenteRetorna400() throws Exception {
 		mockMvc.perform(get("/alunos").param("sort", "senha")).andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.mensagem").value(containsString("Campos aceitos")));
+				.andExpect(jsonPath("$.erro").value("Requisição inválida"))
+				.andExpect(jsonPath("$.mensagem").value(containsString("'senha'")));
 		mockMvc.perform(get("/alunos").param("sort", "nome,sideways")).andExpect(status().isBadRequest());
-		mockMvc.perform(get("/alunos").param("page", "-1")).andExpect(status().isBadRequest());
-		mockMvc.perform(get("/alunos").param("size", "0")).andExpect(status().isBadRequest());
-		mockMvc.perform(get("/alunos").param("size", "101")).andExpect(status().isBadRequest());
-		mockMvc.perform(get("/alunos").param("page", "abc")).andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void listarComFiltroAtivoInvalidoRetorna400() throws Exception {
 		mockMvc.perform(get("/alunos").param("ativo", "talvez")).andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void listarSemParametrosUsaPaginaZeroComTamanhoPadraoVinteOrdenadaPeloId() throws Exception {
+		mockMvc.perform(get("/alunos"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.page").value(0))
+				.andExpect(jsonPath("$.size").value(20))
+				.andExpect(jsonPath("$.content[0].id").value(1))
+				.andExpect(jsonPath("$.content[1].id").value(2));
+	}
+
+	@Test
+	void listarComSizeAcimaDoMaximoReduzParaCinquenta() throws Exception {
+		mockMvc.perform(get("/alunos").param("size", "500"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.size").value(50));
+	}
+
+	@Test
+	void listarComPageESizeForaDaFaixaCaiNosPadroesEmVezDeDar400() throws Exception {
+		mockMvc.perform(get("/alunos").param("page", "-1")).andExpect(status().isOk())
+				.andExpect(jsonPath("$.page").value(0));
+		mockMvc.perform(get("/alunos").param("size", "0")).andExpect(status().isOk())
+				.andExpect(jsonPath("$.size").value(20));
+		mockMvc.perform(get("/alunos").param("page", "abc")).andExpect(status().isOk())
+				.andExpect(jsonPath("$.page").value(0));
+	}
+
+	@Test
+	void listarOrdenaPorQualquerCampoDaEntidadeEmOrdemDecrescente() throws Exception {
+		mockMvc.perform(get("/alunos").param("sort", "dataNascimento,desc").param("size", "2"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.size").value(2))
+				.andExpect(jsonPath("$.content.length()").value(2));
+		mockMvc.perform(get("/alunos").param("sort", "ativo")).andExpect(status().isOk());
 	}
 
 	// ---------- PUT /alunos/{id} ----------

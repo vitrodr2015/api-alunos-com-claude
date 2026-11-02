@@ -547,7 +547,7 @@
                 }
               ]
             },
-            "description": "sort aceita id, nome, email e dataNascimento, com ,asc ou ,desc."
+            "description": "page começa em 0; size padrão 20 e máximo 50 (acima disso é reduzido); sort aceita qualquer campo do aluno (id, nome, email, dataNascimento, ativo), com ,asc ou ,desc. Campo inexistente dá 400."
           }
         },
         {
@@ -1150,19 +1150,15 @@
           }
         },
         {
-          "name": "400 - Listar com size 101",
+          "name": "200 - Listar com size 101 (não é erro: é reduzido para 50)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
-                  "pm.test('Corpo no formato ErrorResponse', () => {",
-                  "  const corpo = pm.response.json();",
-                  "  pm.expect(corpo).to.have.all.keys('dataHora', 'status', 'erro', 'mensagem');",
-                  "  pm.expect(corpo.status).to.eql(400);",
-                  "});"
+                  "pm.test('Status 200 (size acima do máximo é reduzido, não recusado)', () => pm.response.to.have.status(200));",
+                  "pm.test('size reduzido para o máximo de 50', () => pm.expect(pm.response.json().size).to.eql(50));"
                 ]
               }
             }

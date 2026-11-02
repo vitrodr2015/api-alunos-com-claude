@@ -53,7 +53,7 @@
 | 10. Testar a aplicação | ✅ Feita (API respondendo pelo IP público, testada no Postman) |
 | 11. Ligar a esteira (GitHub Actions) | ✅ Feita (primeiro deploy: Task Definition `:2`; release 1.1.0 com o banco: `:6`, ver seção 11) |
 | 15.1 Ligar o ambiente | ✅ Feita em 2026-11-01 e de novo em 2026-11-02 (RDS Available e Service com 1 tarefa, antes da release 1.1.0) |
-| 15.2 Desligar o ambiente | ✅ Feita em 2026-10-30 (Desired tasks = 0 e RDS parado) |
+| 15.2 Desligar o ambiente | ✅ Feita em 2026-10-30 e de novo em 2026-11-02 (Desired tasks = 0 e RDS `Stopped temporarily`) |
 
 ---
 

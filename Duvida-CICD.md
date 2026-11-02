@@ -420,6 +420,12 @@ Ao final, a porta 3306 do grupo `default` ficou com estas origens:
 
 > 💡 A pasta `.github/` chegou a aparecer como ignorada no `git status --ignored`. Hoje o workflow está versionado (`git ls-files` lista o arquivo) e `git check-ignore -v .github` não devolve regra nenhuma, então não foi preciso mexer no `.gitignore`.
 
+**Atualizações depois da primeira versão da esteira (2026-11-01):**
+
+- **Permissões:** o workflow ganhou `permissions: contents: read` (menor privilégio). O deploy não usa o `GITHUB_TOKEN`, e sim as chaves da AWS, então nada quebrou (deploy `success`).
+- **Gatilhos com Git Flow:** `push` só na `main` (build, testes e deploy) e `pull_request` para `main`, `develop` e `release/**` (só build e testes, sem deploy). O check `build` é obrigatório nos rulesets dessas branches. Push em `develop` não dispara deploy de propósito: os passos de deploy usam `if: github.event_name == 'push'`.
+- **Efeito do código na AWS:** a Task Definition já tem `DB_URL`, `DB_USER` e `DB_PASSWORD` (esta via Secrets Manager) com os mesmos nomes que o `application.yml` passou a ler, então não precisa mudar na AWS. Na primeira release com o banco, o Flyway cria a tabela `aluno` no database `crud_alunos` do RDS e aplica a `V2` (insere os 8 alunos iniciais); o RDS precisa estar `Available`. Depois disso os dados passam a ficar no RDS e **sobrevivem** a trocar a tarefa; o 1º deploy não repete a carga nos seguintes (o Flyway guarda a versão aplicada).
+
 **Para o tutorial novo:** dizer que o workflow precisa ser adaptado ao projeto (versão do Java, pasta do projeto, nome da imagem do `docker compose`, nomes do ECR, do contêiner, do Service e do cluster); avisar que o `task-definition.json` precisa existir e estar versionado; avisar que a tag do deploy é o hash do commit e que `latest` é só uma cópia; lembrar que *Desired tasks* não é alterado pela esteira.
 
 ---
@@ -430,7 +436,7 @@ Ao final, a porta 3306 do grupo `default` ficou com estas origens:
 
 **Passo a passo executado em 2026-11-01** (a tarefa subiu e a API respondeu no Postman):
 
-1. **RDS:** **Aurora and RDS** → **Databases** → `database-crud-alunos` → **Actions** → **Start**, e esperar **Available**. *(Hoje a aplicação guarda os alunos em memória e não conecta no banco, então a tarefa sobe mesmo com o RDS parado. Mantenha a ordem do tutorial para já criar o hábito.)*
+1. **RDS:** **Aurora and RDS** → **Databases** → `database-crud-alunos` → **Actions** → **Start**, e esperar **Available**. *(Na release 1.0.0 a aplicação guarda os alunos em memória e não conecta no banco, então a tarefa sobe mesmo com o RDS parado. **A partir da release com o banco** (JPA, datasource e Flyway, hoje só na `develop`) a aplicação exige o banco no arranque: com o RDS parado a tarefa cai ao subir. Ligue sempre o RDS primeiro.)*
 2. **Service:** **Elastic Container Service** → **Clusters** → `cluster-crud-alunos` → aba **Services** → `service-crud-alunos` → **Update** → **Desired tasks = 1** → **Update**.
 3. Aba **Tasks** do cluster (filtro *Any desired status*): esperar **Last status = Running**.
 4. **IP novo:** coluna **Public IP** da tarefa, ou ID da tarefa → **Configuration** → **Public IP**.

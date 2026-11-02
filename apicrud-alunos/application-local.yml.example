@@ -1,0 +1,14 @@
+# Modelo para o seu application-local.yml (copie para src/main/resources/application-local.yml).
+# O application-local.yml real é ignorado pelo Git; este modelo é versionado e NÃO deve ter segredos.
+# Só vale com o perfil ativo: SPRING_PROFILES_ACTIVE=local (na IDE, em Environment variables).
+#
+# spring:
+#   jpa:
+#     show-sql: true
+# server:
+#   port: 8081
+# logging:
+#   level:
+#     br.com.vitor: DEBUG
+#
+# A senha do banco NÃO vai aqui: use a variável de ambiente DB_PASSWORD.

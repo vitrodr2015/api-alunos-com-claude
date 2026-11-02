@@ -185,7 +185,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 
 - **Nomes próprios** em vez dos do tutorial (`rest-with-claude...`), para não misturar com outros projetos.
 - **Database `crud_alunos`**, criado pela aplicação na primeira conexão (`createDatabaseIfNotExist=true` na `DB_URL`), em vez do `rest_udemy` do tutorial. O database não foi criado no RDS.
-- **Variável `DB_URL` a mais que o tutorial.** O tutorial supõe que o endereço do banco já está no código; aqui ele entra como variável de ambiente na Task Definition. A aplicação lê `DB_URL`, `DB_USER` e `DB_PASSWORD` (ainda não implementado).
+- **Variável `DB_URL` a mais que o tutorial.** O tutorial supõe que o endereço do banco já está no código; aqui ele entra como variável de ambiente na Task Definition. A aplicação lê `DB_URL`, `DB_USER` e `DB_PASSWORD` (implementado no passo 19).
 - **Senha só no Secrets Manager** (`DB_PASSWORD` em `secrets`, tipo `ValueFrom`). Nunca no código, na imagem nem no Git.
 - **Porta 3306 do banco** só para o grupo da aplicação e para o IP do usuário (`/32`). Nunca `0.0.0.0/0`.
 - **`task-definition.json` fica versionado** (não vai no `.gitignore`): a esteira só enxerga o que está no repositório. Ele tem ID da conta e ARNs, mas nenhuma senha.
@@ -205,7 +205,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 2. ~~Seção 8: enviar a imagem para o ECR~~ (feito).
 3. ~~Seção 9: criar o Service~~ (feito; a tarefa só subiu depois de dar à `ecsTaskExecutionRole` a permissão de ler o secret).
 4. ~~Seção 10: testar a API pelo IP público (Postman)~~ (feito; sem Swagger nem login, o teste é `GET /alunos`).
-5. Conexão com o MySQL na aplicação: JPA, driver, `application.yml` lendo `DB_URL`/`DB_USER`/`DB_PASSWORD`, `repository`.
+5. ~~Conexão com o MySQL na aplicação: JPA, driver, `application.yml` lendo `DB_URL`/`DB_USER`/`DB_PASSWORD`, `repository`~~ (feito nos passos 17 a 22, só na `develop`; falta o `AlunoService` usar o repository).
 6. ~~Seção 11: workflow do GitHub Actions e secrets~~ (feito, ver "Esteira" abaixo; a pasta `.github/` está versionada e sem regra de ignore).
 7. Seções 12 a 14 (rotina, problemas comuns, limpeza) ainda não executadas. A seção 15 já foi usada (ligar e desligar).
 
@@ -255,7 +255,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 
 ## 16. Fluxo Git Flow
 
-- **Status:** em andamento (branches e regras criadas; falta praticar o ciclo completo)
+- **Status:** concluído; ciclo completo praticado em 2026-11-01 (release `1.0.0`)
 - Motivo: o usuário quis juntar vários PRs numa versão e só então acionar a esteira, e escolheu estudar o Git Flow.
 - Branches:
 
@@ -271,10 +271,131 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - `develop` criada a partir da `main` (commit `22480ce`).
 - Workflow: PRs para `main`, `develop` e `release/**` rodam build e testes; o deploy continua só em `push` na `main` (primeira feature: `feature/ci-gitflow`). O `push` em `develop` não foi incluído de propósito: os passos de deploy usam `if: github.event_name == 'push'` e publicariam a cada merge na `develop`.
 - `gh` (GitHub CLI) instalado com `winget` e logado; passou a abrir PRs e a acompanhar o `build` pelo terminal.
-- Ciclo completo (a praticar): `feature/x` → PR para `develop` → `release/1.0.0` a partir da `develop` → PR para `main` com merge commit → tag `v1.0.0` → PR da `main` de volta para a `develop`.
+- Ciclo completo, como foi feito:
+  1. `feature/ci-gitflow` → PR #3 → `develop`.
+  2. `feature/aluno-8` → PR #4 → `develop`.
+  3. `release/1.0.0` criada a partir da `develop`.
+  4. PR #5 `release/1.0.0` → `main`, com merge commit (`7e10a2f`). O merge disparou a esteira, que fez o deploy (`success`); a tarefa foi trocada e o IP mudou.
+  5. Tag anotada `v1.0.0` no commit `7e10a2f`.
+  6. PR #6 `main` → `develop`, para a `develop` receber o merge commit da release.
+- A `release/1.0.0` foi usada como acumulador (ideia do usuário): o PR #5 ficou aberto enquanto mais PRs podiam entrar na release, e o deploy só aconteceu no merge. No Git Flow clássico a release só recebe correções e as features novas esperam a próxima; fica como segundo exercício.
+- Pendente: apagar no GitHub as branches já mescladas (`release/1.0.0`, `feature/ci-gitflow`, `feature/aluno-8`, `ci-permissions`, `teste-ci-quebrado`). O sistema bloqueou `git push origin --delete`, então é pelo botão **Delete branch**.
+
+## 17. Banco de dados local (MySQL em Docker)
+
+- **Status:** concluído (2026-11-01)
+- Contêiner `mysql-dev`, imagem `mysql:8.4` (versão 8.4.11), `utf8mb4` e `utf8mb4_unicode_ci`, com o volume `mysql-dev-data` (os dados sobrevivem a reiniciar ou recriar o contêiner).
+- Database criado na subida (`MYSQL_DATABASE`): `crud_alunos`, o mesmo nome usado na AWS. Vazio, sem tabelas.
+- **Porta 3307 no computador** (`-p 3307:3306`), não 3306: o Windows tem o serviço **MySQL84** (MySQL Server 8.4 instalado, início automático) ocupando a 3306. A URL local fica `jdbc:mysql://localhost:3307/crud_alunos`. O `netstat -ano` não mostrou a 3306 ocupada nem as portas do `mysqld`; o erro do Docker (`Only one usage of each socket address`) foi o que revelou o conflito.
+- Senha: só de desenvolvimento, **não registrada** em arquivo do repositório (que é público). Para conectar: HeidiSQL ou DBeaver em `localhost`, porta `3307`, usuário `root`.
+- Comando usado (a senha foi passada por variável do shell, para não ficar escrita no comando):
+
+  ```bash
+  docker run -d --name mysql-dev \
+    -e MYSQL_ROOT_PASSWORD="$SENHA_DEV" -e MYSQL_DATABASE=crud_alunos \
+    -p 3307:3306 -v mysql-dev-data:/var/lib/mysql mysql:8.4 \
+    --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+  ```
+
+- Verificação feita por `docker exec`: versão 8.4.11, database `crud_alunos` com `utf8mb4`/`utf8mb4_unicode_ci`, sem tabelas. Conferido também pelo usuário no HeidiSQL (`localhost`, porta 3307, `root`): conectou e viu o schema `crud_alunos` vazio, o "Pronto quando" do passo.
+- Outros contêineres antigos na máquina (`rest-mysql`, `rest-app`, `keen_williamson`) são de projetos anteriores e estão parados; não foram tocados.
+- Comandos úteis: `docker stop mysql-dev` e `docker start mysql-dev`. Apagar o contêiner (`docker rm`) mantém os dados; só `docker volume rm mysql-dev-data` os apaga. O Compose da Fase 9 vai substituir este comando.
+
+## 18. Dependências de JPA e do driver
+
+- **Status:** concluído nesta etapa (branch `feature/jpa-dependencias`); a aplicação **real** só sobe depois do passo seguinte do playbook (datasource)
+- `pom.xml`: `spring-boot-starter-data-jpa`, `com.mysql:mysql-connector-j` (escopo `runtime`; o `mysql-connector-java` é o antigo, descontinuado) e `com.h2database:h2` (escopo `test`).
+- `src/test/resources/application.yml` (novo): `spring.application.name`, `jpa.hibernate.ddl-auto: create-drop` e `jpa.open-in-view: false`. Sem `datasource` nesse arquivo, o Spring Boot usa o H2 em memória nos testes. O arquivo de teste substitui o de `src/main/resources` durante os testes (mesmo nome, vence o `test-classes`).
+- Resultado: 52 testes passando com o H2 (`ApicrudAlunosApplicationTests` e os `@SpringBootTest` sobem o contexto inteiro com o JPA). Na primeira rodada, logo depois de mudar o `pom.xml`, o Maven terminou com `BUILD FAILURE` por falha de teste; o motivo não foi guardado. Três rodadas seguintes passaram sem falhas. Fica anotado como instabilidade não explicada; se voltar, guardar o relatório em `target/surefire-reports`.
+- **Atenção ao fluxo:** sem `datasource` no `application.yml` principal, a aplicação real falha ao subir (`Failed to determine a suitable driver class`). Como o merge na `main` faz deploy, **este passo não pode ir para a `main` sem o datasource**: os dois passos têm de entrar juntos na mesma release.
+- Ainda não há `@Entity`: o `Aluno` continua em memória até o repository entrar.
+
+## 19. Datasource sem expor segredos
+
+- **Status:** concluído (branch `feature/datasource`)
+- `src/main/resources/application.yml`: `datasource` com `driver-class-name: com.mysql.cj.jdbc.Driver`, `url: ${DB_URL:...}`, `username: ${DB_USER:root}` e `password: ${DB_PASSWORD}` **sem valor padrão**.
+- Padrão de variáveis escolhido: as próprias (`DB_URL`, `DB_USER`, `DB_PASSWORD`), as mesmas que a Task Definition da AWS já usa. Não usamos as nativas do Spring (`SPRING_DATASOURCE_*`).
+- Valor padrão da URL (só para desenvolvimento): `jdbc:mysql://localhost:3307/crud_alunos?createDatabaseIfNotExist=true`, o MySQL do Docker do passo 17 (porta 3307, não 3306). O usuário padrão é `root`. Na AWS, `DB_URL` vem da Task Definition.
+- **Descoberta importante:** o Spring Boot **não falha** quando `${DB_PASSWORD}` não existe. Ele envia o texto literal `${DB_PASSWORD}` como senha, o MySQL responde `Access denied for user 'root' (using password: YES)` e o erro final aparece como `Unable to determine Dialect without JDBC metadata`, sem citar a senha. Isso não cumpre o "Pronto quando" do passo (erro claro).
+- Correção: em `ApicrudAlunosApplication.main`, um listener de `ApplicationEnvironmentPreparedEvent` lança `IllegalStateException` com a mensagem "A variável de ambiente DB_PASSWORD não foi definida..." se houver `spring.datasource.url` e a senha estiver vazia. Primeira tentativa foi um `@Component` com `@Value`, mas ele rodava depois de o Hibernate tentar conectar, então não servia. No `main`, os testes (que usam o H2 e não passam por ele) não são afetados.
+- Verificado (2026-11-01):
+  - sem `DB_PASSWORD`: a aplicação para na hora com a mensagem clara, sem tentar conectar;
+  - com `DB_PASSWORD` e o `mysql-dev` ligado: sobe em cerca de 4 s, conecta no MySQL e `GET /alunos/8` devolve Helena Barros;
+  - `mvnw test`: 52 testes passando (H2);
+  - `grep` por senha, chave e token no repositório: só nomes e ARNs de secret, nenhum valor. A senha de desenvolvimento não aparece em nenhum arquivo versionado.
+- Rodar pela IDE ou pelo terminal agora exige a variável: no IntelliJ, Run → Edit Configurations → Environment variables (`DB_PASSWORD=...`); no terminal, `export DB_PASSWORD=...` antes de `./mvnw spring-boot:run`.
+- **Cuidado com o deploy:** a aplicação passa a **exigir o banco no arranque**. Na AWS, o RDS precisa estar `Available` antes do Service subir, senão a tarefa cai ao iniciar. A Task Definition já tem `DB_URL`, `DB_USER` e `DB_PASSWORD` (esta última via Secrets Manager), com os mesmos nomes. O `Aluno` continua em memória: o banco só é conectado, ainda sem tabelas nem `repository`.
+
+## 20. Perfis e arquivos locais
+
+- **Status:** concluído (branch `feature/perfis-locais`)
+- O `.gitignore` da raiz já ignorava `application-local.yml`, `application-secret*.yml`, `.env` e `.env.*`; conferido com `git check-ignore`. Nada novo foi preciso nele.
+- Configuração só desta máquina vai em `apicrud-alunos/src/main/resources/application-local.yml` (ignorado). Só vale com o perfil ativo: `SPRING_PROFILES_ACTIVE=local` (na IDE, em Environment variables; no terminal, `export SPRING_PROFILES_ACTIVE=local`).
+- Teste feito com um `application-local.yml` temporário (`server.port: 8081`): sem o perfil a aplicação subiu na 8080 e ignorou o arquivo; com `SPRING_PROFILES_ACTIVE=local` subiu na 8081. O arquivo temporário foi removido e nunca apareceu no `git status`.
+- Criado o modelo `apicrud-alunos/application-local.yml.example` (versionado, só com exemplos comentados e sem segredos). Fica fora de `src/main/resources` para não ser empacotado no JAR. O nome `.example` não casa com a regra de ignore.
+- Os testes têm o próprio `src/test/resources/application.yml`, que **substitui** o de `main`, não soma. Prova no projeto: o `application.yml` principal tem datasource MySQL e a senha sem padrão, e os testes sobem normalmente com H2, o que não aconteceria se os dois fossem somados. Quando entrar a segurança (JWT), o arquivo de teste precisa declarar tudo o que os testes exigirem.
+- A senha do banco não vai em nenhum desses arquivos: continua na variável `DB_PASSWORD`.
+
+## 21. Migrations com Flyway
+
+- **Status:** concluído (branch `feature/flyway`)
+- **Diferença do playbook:** ele manda `flyway-core` + `flyway-mysql`. No Spring Boot 4 a autoconfiguração do Flyway vem no starter próprio, então o `pom.xml` leva `spring-boot-starter-flyway` (traz o `flyway-core`) e `org.flywaydb:flyway-mysql`; as versões são gerenciadas pelo Boot.
+- `src/main/resources/application.yml`: `spring.flyway.enabled: true`, `locations: classpath:db/migration`, `spring.jpa.hibernate.ddl-auto: validate` (o Hibernate só confere o banco, nunca o altera) e `open-in-view: false` (o log avisava que vinha ligado por padrão).
+- `src/test/resources/application.yml`: `spring.flyway.enabled: false`. Os testes usam H2 e a migration é específica do MySQL.
+- Migration `src/main/resources/db/migration/V1__create_table_aluno.sql`: tabela `aluno` com `id` (BIGINT, auto incremento), `nome` (VARCHAR 100), `email` (VARCHAR 255, único), `data_nascimento` (DATE) e `ativo` (BOOLEAN, padrão verdadeiro), em InnoDB `utf8mb4`/`utf8mb4_unicode_ci`. A collation não diferencia maiúsculas de minúsculas, o que dá a unicidade de e-mail sem caixa que o contrato (passo 5) pede.
+- Verificado no `mysql-dev` (banco vazio, 2026-11-01):
+  - 1ª subida: Flyway criou `flyway_schema_history` e aplicou a versão 1 (`create table aluno`); a aplicação subiu em cerca de 4 s;
+  - 2ª subida: `Successfully validated 1 migration` e `Schema is up to date. No migration necessary`;
+  - `GET /alunos/8` responde normalmente (o `Aluno` ainda está em memória);
+  - `mvnw test`: 52 testes passando, com o Flyway desligado.
+- O aviso "MySQL 8.4 is newer than this version of Flyway" **não apareceu**. Durante o build, o Maven mostra avisos `HTTP Status: 401` de repositórios que o `flyway-mysql` declara; são só ruído, o build não falha.
+- Falhas de teste durante a verificação: uma subida falhou com `Port 8080 was already in use`, porque a instância anterior ainda estava no ar. Foi colisão do teste, não da aplicação.
+- Ainda **sem seed**: os 8 alunos fixos continuam na lista em memória do `AlunoService`. Quando o service passar a usar o banco, eles entram em uma migration nova (`V2__...`), nunca editando a `V1`.
+- Regras: nunca editar uma migration já aplicada (criar uma nova); banco que já existia sem Flyway precisa de `baseline-on-migrate`; evitar `ddl-auto: update`.
+- **Deploy:** ao subir na AWS, o Flyway vai criar a tabela `aluno` no database `crud_alunos` do RDS na primeira vez. Isso exige o RDS `Available` e o usuário `root` com permissão de criar tabela (tem).
+
+## 22. Entidade e repository
+
+- **Status:** concluído (branch `feature/entidade-repository`)
+- `model/Aluno` virou entidade JPA: `@Entity`, `@Table(name = "aluno")`, `@Id` + `@GeneratedValue(strategy = IDENTITY)` e `@Column` em cada campo, com nomes e tamanhos iguais aos da migration `V1__create_table_aluno.sql` (`nome` 100, `email` 255, `data_nascimento`, `ativo`). Em Spring Boot 4 / Jakarta, as anotações vêm de `jakarta.persistence`.
+- `repository/AlunoRepository extends JpaRepository<Aluno, Long>`. Sem consultas próprias por enquanto; elas entram quando o `AlunoService` passar a usar o banco.
+- O `AlunoService` **continua usando a lista em memória**: este passo só cria a entidade e o repository. A troca fica para o passo seguinte, junto com a migration `V2__...` dos 8 alunos fixos.
+- Verificado (2026-11-01):
+  - `mvnw test`: 52 testes passando (H2, com `ddl-auto: create-drop`);
+  - aplicação no MySQL local com `ddl-auto: validate`: sobe em cerca de 4 s, sem reclamar de coluna ou tipo (o "Pronto quando");
+  - prova de que o `validate` confere de verdade: troquei temporariamente o nome da coluna `data_nascimento` na entidade e a aplicação **não subiu**, com `Schema validation: missing column [data_nasc_errada] in table [aluno]`. A alteração foi desfeita. Até este passo o `validate` não tinha nenhuma entidade para conferir, então "subir sem erro" ainda não provava nada.
+- Os testes com H2 não validam a migration do MySQL (o H2 cria o schema a partir da entidade, e o Flyway está desligado neles); a conferência contra o MySQL real é a subida acima. (Correção: eu tinha anotado aqui que um teste de repositório entraria no Passo 24 do playbook; o Passo 24 trata dos dados de teste e do Flyway desligado, não de teste de repositório.)
+
+## 23. Trocar o mock pelo repository
+
+- **Status:** concluído (branch `feature/service-com-repository`)
+- `AlunoService` agora recebe o `AlunoRepository` **por construtor** e não tem mais a lista em memória, nem o `synchronized` (a concorrência passa a ser do banco). Mesmo contrato: as mesmas validações e as mesmas exceções (`InvalidRequestException`, `ResourceNotFoundException`, `ConflictException`) e as mesmas mensagens em português.
+- `@Transactional` nos métodos de escrita (`criar`, `atualizar`, `desativar`, `ativar`, `remover`) e `@Transactional(readOnly = true)` nos de leitura (`listar`, `buscar`). `open-in-view: false` já estava definido no passo 21.
+- `AlunoRepository` ganhou as consultas que substituem os filtros em memória:
+  - `buscar(nome, ativo, Pageable)`, em JPQL: `locate(lower(:nome), lower(a.nome)) > 0 and (:ativo is null or a.ativo = :ativo)`. Usei `locate` em vez de `like` para `%` e `_` digitados pelo usuário não virarem curinga; `ativo` nulo traz todos;
+  - `existsByEmailIgnoreCase` e `existsByEmailIgnoreCaseAndIdNot` (na atualização o próprio aluno não conta como conflito).
+- Ordenação: `sort` continua no formato `campo` ou `campo,asc|desc`, com os campos `id`, `nome`, `email` e `dataNascimento`; `nome` e `email` ordenam sem diferenciar maiúsculas de minúsculas, e o `id` desempata (menos quando já se ordena por `id`, para não gerar `order by id, id`). Paginação: `page` ≥ 0 e `size` de 1 a 100, como antes.
+- **Carga inicial:** os 8 alunos que ficavam fixos na lista foram para a migration `V2__insert_alunos_iniciais.sql` (a `V1` não foi editada). Sem id explícito: numa tabela vazia o `AUTO_INCREMENT` gera 1 a 8 e os próximos começam no 9.
+- **Diferença do playbook:** o playbook deixa o `data.sql` para o Passo 24, mas sem carga os testes do CRUD (`AlunoControllerTests` e outros, que esperam os alunos 1 a 8) quebram e o CI ficaria vermelho. Por isso criei já `src/test/resources/data.sql` (os mesmos 8 alunos, também sem id explícito: no H2 um id explícito deixaria a sequência em 1 e a primeira criação colidiria) e `spring.jpa.defer-datasource-initialization: true` no `application.yml` de teste, para o script rodar depois de o Hibernate criar a tabela. O Passo 24 pode ampliar esse arquivo.
+- **Testes unitários do service:** `AlunoServiceTests`, com Mockito (`@ExtendWith(MockitoExtension.class)`, `@Mock AlunoRepository`, `@InjectMocks AlunoService`), 16 testes sem Spring e sem banco: criação (ativo, id ignorado, conflito), busca (achou, 404, id inválido sem consultar o banco), atualização (campos, `ativo` preservado, conflito, 404 antes de checar o e-mail), ativar/desativar (idempotentes, 404), remover (apaga, 404 sem apagar) e listagem (página, ordenação com `ignoreCase` e desempate por id, filtros nulos, parâmetros inválidos).
+- **Resultado:** `mvnw test` com 68 testes passando (52 antigos + 16 novos). Os 52 antigos, que testavam o CRUD mockado, voltam a passar contra o banco (H2 + `data.sql`).
+- **Verificado no MySQL local** (`mysql-dev`, 2026-11-01): ao subir, o Flyway aplicou a `V2` e a aplicação ficou de pé em cerca de 5 s. As rotas devolvem os dados do banco: lista paginada e ordenada, filtros `nome=SOUZA` e `ativo`, `GET /alunos/8`; `POST` → 201 com `Location`; e-mail repetido, inclusive trocando a caixa → 409; `PUT` (e 409 com e-mail de outro aluno); `PATCH disable/enable`; `DELETE` → 204 e depois 404; ids inválidos e `sort` inválido → 400. Conferi o banco direto por `docker exec`. O aluno de teste (id 9) foi apagado pela própria rota; o próximo `id` local será 10.
+- **Limite conhecido:** se dois pedidos com o mesmo e-mail chegarem ao mesmo tempo, os dois passam pela checagem e a restrição `UNIQUE` do banco recusa o segundo com `DataIntegrityViolationException`, que hoje cai no tratamento genérico (500). Dá para mapear para 409 no `GlobalExceptionHandler`; fica anotado.
+- **Efeito no deploy:** no primeiro deploy com o banco, o Flyway cria a tabela e aplica a `V2` no RDS (o RDS precisa estar `Available`). A coleção do Postman, com 10 alunos de exemplo, passa a responder 409 para os e-mails que já existem na carga.
+
+## 24. Testes rápidos com H2: dados de teste e Flyway desligado
+
+- **Status:** concluído (branch `feature/h2-dados-de-teste`)
+- Quase tudo o que o passo pede já tinha entrado nos passos 18, 21 e 23. O `src/test/resources/application.yml` completo ficou assim: `flyway.enabled: false` (passo 21), `jpa.hibernate.ddl-auto: create-drop`, `jpa.open-in-view: false`, `jpa.defer-datasource-initialization: true` (passo 23) e, **novo neste passo**, `spring.sql.init.mode: always`. Para banco embutido o `always` já é o padrão; ficou explícito para não depender disso.
+- `src/test/resources/data.sql` (passo 23): os 8 alunos, **sem informar o `id`** nos inserts. Com id explícito o H2 não avança a sequência e o próximo `POST` colide; sem id, o auto incremento segue de 9 em diante.
+- **`@DirtiesContext` não foi necessário.** Conferi os testes que alteram dados: eles só mexem em alunos que criam na hora (e-mail e nome únicos) ou no id inexistente `987654`; nenhum altera os alunos 1 a 8, e as listagens filtram por uma marca única. Como prova, rodei a suíte 3 vezes com `-Dsurefire.runOrder=random` (embaralha a ordem das **classes**; a ordem dos métodos dentro de cada classe é do JUnit): 68 testes passando nas 3. Se um teste futuro precisar alterar os alunos 1 a 8, aí sim usar `@DirtiesContext` (recria o contexto e restaura a carga).
+- **"`mvn test` passa sem nenhum banco ligado":** os testes usam o H2 em memória (sem `datasource` no arquivo de teste) e o Flyway desligado; o `DB_PASSWORD` e o MySQL não entram. A esteira do GitHub, que não tem MySQL nenhum, roda os 68 testes e passa em cada PR (`build` verde).
+- **Limite (lembrete do playbook):** como o Flyway fica desligado nos testes, as migrations **não são exercitadas** por eles. Cada migration nova precisa ser validada subindo a aplicação contra o MySQL local (passo 17), como fizemos com a `V1` e a `V2`. A conferência automática com MySQL real é o Passo 39 do playbook.
+- Correção de uma anotação minha: no passo 22 eu disse que um teste de repositório entraria no Passo 24; não é o caso. O Passo 24 é este (dados de teste e Flyway desligado).
 
 ## Próximos passos
 
-- Conectar a aplicação ao MySQL (passo 5 da lista "Falta fazer" do passo 11).
+- Próximo passo do playbook (a partir do 25).
+- Segunda release (com o banco): RDS `Available` antes do merge na `main`; o Flyway cria a tabela no RDS.
 - Seções 12 a 14 do tutorial (rotina, problemas comuns, limpeza).
 - Decidir sobre as sobras na AWS (`rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos`).

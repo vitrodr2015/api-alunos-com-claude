@@ -1,24 +1,23 @@
 package br.com.vitor.apicrud_alunos.service;
 
-import java.time.LocalDate;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import br.com.vitor.apicrud_alunos.dto.PageResponse;
 import br.com.vitor.apicrud_alunos.exception.ConflictException;
 import br.com.vitor.apicrud_alunos.exception.InvalidRequestException;
 import br.com.vitor.apicrud_alunos.exception.ResourceNotFoundException;
 import br.com.vitor.apicrud_alunos.model.Aluno;
+import br.com.vitor.apicrud_alunos.repository.AlunoRepository;
 
-// CRUD mockado: os alunos ficam em memória até o repository entrar
 @Service
 public class AlunoService {
 
@@ -26,103 +25,84 @@ public class AlunoService {
 
 	private static final int TAMANHO_MAXIMO_PAGINA = 100;
 
-	private static final Map<String, Comparator<Aluno>> ORDENACOES = Map.of(
-			"id", Comparator.comparing(Aluno::getId),
-			"nome", Comparator.comparing(Aluno::getNome, String.CASE_INSENSITIVE_ORDER),
-			"email", Comparator.comparing(Aluno::getEmail, String.CASE_INSENSITIVE_ORDER),
-			"dataNascimento", Comparator.comparing(Aluno::getDataNascimento));
+	// campos pelos quais a lista pode ser ordenada (nomes das propriedades da entidade)
+	private static final Set<String> CAMPOS_ORDENAVEIS = Set.of("id", "nome", "email", "dataNascimento");
 
-	private final List<Aluno> alunos = new CopyOnWriteArrayList<>();
-	private long proximoId = 1;
+	// ordenar por texto sem diferenciar maiúsculas de minúsculas
+	private static final Set<String> CAMPOS_DE_TEXTO = Set.of("nome", "email");
 
-	// Registros fixos, para a API já nascer com dados
-	public AlunoService() {
-		semear("Ana Souza", "ana.souza@escola.com", LocalDate.of(2000, 5, 10));
-		semear("Bruno Lima", "bruno.lima@escola.com", LocalDate.of(1999, 3, 21));
-		semear("Carla Dias", "carla.dias@escola.com", LocalDate.of(2001, 11, 2));
-		semear("Diego Martins", "diego.martins@escola.com", LocalDate.of(1998, 7, 15));
-		semear("Eduarda Costa", "eduarda.costa@escola.com", LocalDate.of(2002, 1, 30));
-		semear("Felipe Rocha", "felipe.rocha@escola.com", LocalDate.of(1997, 9, 8));
-		semear("Gustavo Alves", "gustavo.alves@escola.com", LocalDate.of(2003, 4, 17));
-		semear("Helena Barros", "helena.barros@escola.com", LocalDate.of(2000, 12, 3));
+	private final AlunoRepository repository;
+
+	public AlunoService(AlunoRepository repository) {
+		this.repository = repository;
 	}
 
-	public synchronized Aluno criar(Aluno novo) {
+	@Transactional
+	public Aluno criar(Aluno novo) {
 		validarEmailDisponivel(novo.getEmail(), null);
-		novo.setId(proximoId++);
+		novo.setId(null);
 		novo.setAtivo(true);
-		alunos.add(novo);
-		log.info("POST /alunos - aluno criado com id={}", novo.getId());
-		return novo;
+		Aluno salvo = repository.save(novo);
+		log.info("POST /alunos - aluno criado com id={}", salvo.getId());
+		return salvo;
 	}
 
-	public synchronized PageResponse<Aluno> listar(String nome, Boolean ativo, int page, int size, String sort) {
+	@Transactional(readOnly = true)
+	public PageResponse<Aluno> listar(String nome, Boolean ativo, int page, int size, String sort) {
 		if (page < 0) {
 			throw new InvalidRequestException("O parâmetro page deve ser maior ou igual a 0");
 		}
 		if (size < 1 || size > TAMANHO_MAXIMO_PAGINA) {
 			throw new InvalidRequestException("O parâmetro size deve estar entre 1 e " + TAMANHO_MAXIMO_PAGINA);
 		}
-		Comparator<Aluno> ordenacao = ordenacao(sort);
-		String filtroNome = nome == null ? "" : nome.trim().toLowerCase(Locale.ROOT);
+		Sort ordenacao = ordenacao(sort);
+		String filtroNome = nome == null ? "" : nome.trim();
 
-		List<Aluno> filtrados = alunos.stream()
-				.filter(a -> a.getNome().toLowerCase(Locale.ROOT).contains(filtroNome))
-				.filter(a -> ativo == null || a.isAtivo() == ativo)
-				.sorted(ordenacao.thenComparing(Aluno::getId))
-				.toList();
-
-		int total = filtrados.size();
-		int inicio = (int) Math.min((long) page * size, total);
-		int fim = Math.min(inicio + size, total);
-		int totalPaginas = (total + size - 1) / size;
-		return new PageResponse<>(filtrados.subList(inicio, fim), page, size, total, totalPaginas);
+		Page<Aluno> pagina = repository.buscar(filtroNome, ativo, PageRequest.of(page, size, ordenacao));
+		return new PageResponse<>(pagina.getContent(), page, size, pagina.getTotalElements(), pagina.getTotalPages());
 	}
 
-	public synchronized Aluno buscar(Long id) {
+	@Transactional(readOnly = true)
+	public Aluno buscar(Long id) {
 		validarId(id);
-		return alunos.stream()
-				.filter(a -> a.getId().equals(id))
-				.findFirst()
+		return repository.findById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Aluno não encontrado com id=" + id));
 	}
 
-	public synchronized Aluno atualizar(Long id, Aluno dados) {
+	@Transactional
+	public Aluno atualizar(Long id, Aluno dados) {
 		Aluno aluno = buscar(id);
 		validarEmailDisponivel(dados.getEmail(), id);
 		aluno.setNome(dados.getNome());
 		aluno.setEmail(dados.getEmail());
 		aluno.setDataNascimento(dados.getDataNascimento());
+		Aluno salvo = repository.save(aluno);
 		log.info("PUT /alunos/{} - aluno atualizado", id);
-		return aluno;
+		return salvo;
 	}
 
-	public synchronized Aluno desativar(Long id) {
+	@Transactional
+	public Aluno desativar(Long id) {
 		Aluno aluno = buscar(id);
 		aluno.setAtivo(false);
+		Aluno salvo = repository.save(aluno);
 		log.info("PATCH /alunos/{}/disable - aluno desativado", id);
-		return aluno;
+		return salvo;
 	}
 
-	public synchronized Aluno ativar(Long id) {
+	@Transactional
+	public Aluno ativar(Long id) {
 		Aluno aluno = buscar(id);
 		aluno.setAtivo(true);
+		Aluno salvo = repository.save(aluno);
 		log.info("PATCH /alunos/{}/enable - aluno ativado", id);
-		return aluno;
+		return salvo;
 	}
 
-	public synchronized void remover(Long id) {
-		alunos.remove(buscar(id));
+	@Transactional
+	public void remover(Long id) {
+		repository.delete(buscar(id));
 		log.info("DELETE /alunos/{} - aluno removido", id);
-	}
-
-	private void semear(String nome, String email, LocalDate dataNascimento) {
-		Aluno aluno = new Aluno();
-		aluno.setId(proximoId++);
-		aluno.setNome(nome);
-		aluno.setEmail(email);
-		aluno.setDataNascimento(dataNascimento);
-		alunos.add(aluno);
 	}
 
 	private void validarId(Long id) {
@@ -131,29 +111,37 @@ public class AlunoService {
 		}
 	}
 
+	// idAtual é nulo na criação; na atualização o próprio aluno não conta como conflito
 	private void validarEmailDisponivel(String email, Long idAtual) {
-		boolean emUso = alunos.stream()
-				.anyMatch(a -> !a.getId().equals(idAtual) && a.getEmail().equalsIgnoreCase(email));
+		boolean emUso = idAtual == null
+				? repository.existsByEmailIgnoreCase(email)
+				: repository.existsByEmailIgnoreCaseAndIdNot(email, idAtual);
 		if (emUso) {
 			throw new ConflictException("Já existe um aluno cadastrado com este e-mail");
 		}
 	}
 
-	// sort no formato "campo" ou "campo,asc|desc"
-	private Comparator<Aluno> ordenacao(String sort) {
+	// sort no formato "campo" ou "campo,asc|desc"; o id desempata, para a paginação ser estável
+	private Sort ordenacao(String sort) {
 		String[] partes = sort.split(",");
-		Comparator<Aluno> ordenacao = ORDENACOES.get(partes[0].trim());
-		if (ordenacao == null) {
-			throw new InvalidRequestException("Não é possível ordenar por '" + partes[0].trim()
-					+ "'. Campos aceitos: " + String.join(", ", new TreeSet<>(ORDENACOES.keySet())));
+		String campo = partes[0].trim();
+		if (!CAMPOS_ORDENAVEIS.contains(campo)) {
+			throw new InvalidRequestException("Não é possível ordenar por '" + campo
+					+ "'. Campos aceitos: " + String.join(", ", new TreeSet<>(CAMPOS_ORDENAVEIS)));
 		}
+		Sort.Direction direcao;
 		if (partes.length == 1 || partes[1].trim().equalsIgnoreCase("asc")) {
-			return ordenacao;
+			direcao = Sort.Direction.ASC;
+		} else if (partes.length == 2 && partes[1].trim().equalsIgnoreCase("desc")) {
+			direcao = Sort.Direction.DESC;
+		} else {
+			throw new InvalidRequestException("O parâmetro sort deve ter o formato campo ou campo,asc ou campo,desc");
 		}
-		if (partes.length == 2 && partes[1].trim().equalsIgnoreCase("desc")) {
-			return ordenacao.reversed();
+		Sort.Order ordem = new Sort.Order(direcao, campo);
+		if (CAMPOS_DE_TEXTO.contains(campo)) {
+			ordem = ordem.ignoreCase();
 		}
-		throw new InvalidRequestException("O parâmetro sort deve ter o formato campo ou campo,asc ou campo,desc");
+		return campo.equals("id") ? Sort.by(ordem) : Sort.by(ordem, Sort.Order.asc("id"));
 	}
 
 }

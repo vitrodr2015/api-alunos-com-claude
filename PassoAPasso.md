@@ -366,9 +366,26 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
   - prova de que o `validate` confere de verdade: troquei temporariamente o nome da coluna `data_nascimento` na entidade e a aplicação **não subiu**, com `Schema validation: missing column [data_nasc_errada] in table [aluno]`. A alteração foi desfeita. Até este passo o `validate` não tinha nenhuma entidade para conferir, então "subir sem erro" ainda não provava nada.
 - Os testes com H2 não validam a migration do MySQL (o H2 cria o schema a partir da entidade, e o Flyway está desligado neles); a conferência contra o MySQL real é a subida acima. Um teste automático de repositório entra no Passo 24 do playbook.
 
+## 23. Trocar o mock pelo repository
+
+- **Status:** concluído (branch `feature/service-com-repository`)
+- `AlunoService` agora recebe o `AlunoRepository` **por construtor** e não tem mais a lista em memória, nem o `synchronized` (a concorrência passa a ser do banco). Mesmo contrato: as mesmas validações e as mesmas exceções (`InvalidRequestException`, `ResourceNotFoundException`, `ConflictException`) e as mesmas mensagens em português.
+- `@Transactional` nos métodos de escrita (`criar`, `atualizar`, `desativar`, `ativar`, `remover`) e `@Transactional(readOnly = true)` nos de leitura (`listar`, `buscar`). `open-in-view: false` já estava definido no passo 21.
+- `AlunoRepository` ganhou as consultas que substituem os filtros em memória:
+  - `buscar(nome, ativo, Pageable)`, em JPQL: `locate(lower(:nome), lower(a.nome)) > 0 and (:ativo is null or a.ativo = :ativo)`. Usei `locate` em vez de `like` para `%` e `_` digitados pelo usuário não virarem curinga; `ativo` nulo traz todos;
+  - `existsByEmailIgnoreCase` e `existsByEmailIgnoreCaseAndIdNot` (na atualização o próprio aluno não conta como conflito).
+- Ordenação: `sort` continua no formato `campo` ou `campo,asc|desc`, com os campos `id`, `nome`, `email` e `dataNascimento`; `nome` e `email` ordenam sem diferenciar maiúsculas de minúsculas, e o `id` desempata (menos quando já se ordena por `id`, para não gerar `order by id, id`). Paginação: `page` ≥ 0 e `size` de 1 a 100, como antes.
+- **Carga inicial:** os 8 alunos que ficavam fixos na lista foram para a migration `V2__insert_alunos_iniciais.sql` (a `V1` não foi editada). Sem id explícito: numa tabela vazia o `AUTO_INCREMENT` gera 1 a 8 e os próximos começam no 9.
+- **Diferença do playbook:** o playbook deixa o `data.sql` para o Passo 24, mas sem carga os testes do CRUD (`AlunoControllerTests` e outros, que esperam os alunos 1 a 8) quebram e o CI ficaria vermelho. Por isso criei já `src/test/resources/data.sql` (os mesmos 8 alunos, também sem id explícito: no H2 um id explícito deixaria a sequência em 1 e a primeira criação colidiria) e `spring.jpa.defer-datasource-initialization: true` no `application.yml` de teste, para o script rodar depois de o Hibernate criar a tabela. O Passo 24 pode ampliar esse arquivo.
+- **Testes unitários do service:** `AlunoServiceTests`, com Mockito (`@ExtendWith(MockitoExtension.class)`, `@Mock AlunoRepository`, `@InjectMocks AlunoService`), 16 testes sem Spring e sem banco: criação (ativo, id ignorado, conflito), busca (achou, 404, id inválido sem consultar o banco), atualização (campos, `ativo` preservado, conflito, 404 antes de checar o e-mail), ativar/desativar (idempotentes, 404), remover (apaga, 404 sem apagar) e listagem (página, ordenação com `ignoreCase` e desempate por id, filtros nulos, parâmetros inválidos).
+- **Resultado:** `mvnw test` com 68 testes passando (52 antigos + 16 novos). Os 52 antigos, que testavam o CRUD mockado, voltam a passar contra o banco (H2 + `data.sql`).
+- **Verificado no MySQL local** (`mysql-dev`, 2026-11-01): ao subir, o Flyway aplicou a `V2` e a aplicação ficou de pé em cerca de 5 s. As rotas devolvem os dados do banco: lista paginada e ordenada, filtros `nome=SOUZA` e `ativo`, `GET /alunos/8`; `POST` → 201 com `Location`; e-mail repetido, inclusive trocando a caixa → 409; `PUT` (e 409 com e-mail de outro aluno); `PATCH disable/enable`; `DELETE` → 204 e depois 404; ids inválidos e `sort` inválido → 400. Conferi o banco direto por `docker exec`. O aluno de teste (id 9) foi apagado pela própria rota; o próximo `id` local será 10.
+- **Limite conhecido:** se dois pedidos com o mesmo e-mail chegarem ao mesmo tempo, os dois passam pela checagem e a restrição `UNIQUE` do banco recusa o segundo com `DataIntegrityViolationException`, que hoje cai no tratamento genérico (500). Dá para mapear para 409 no `GlobalExceptionHandler`; fica anotado.
+- **Efeito no deploy:** no primeiro deploy com o banco, o Flyway cria a tabela e aplica a `V2` no RDS (o RDS precisa estar `Available`). A coleção do Postman, com 10 alunos de exemplo, passa a responder 409 para os e-mails que já existem na carga.
+
 ## Próximos passos
 
-- Trocar o `AlunoService` pelo `AlunoRepository` e criar a `V2__...` com os 8 alunos fixos.
+- Passo 24 do playbook (testes de repositório e `data.sql` de teste; o `data.sql` básico já existe desde o passo 23).
 - Segunda release (com o banco): RDS `Available` antes do merge na `main`; o Flyway cria a tabela no RDS.
 - Seções 12 a 14 do tutorial (rotina, problemas comuns, limpeza).
 - Decidir sobre as sobras na AWS (`rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos`).

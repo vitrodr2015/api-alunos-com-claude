@@ -364,7 +364,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
   - `mvnw test`: 52 testes passando (H2, com `ddl-auto: create-drop`);
   - aplicação no MySQL local com `ddl-auto: validate`: sobe em cerca de 4 s, sem reclamar de coluna ou tipo (o "Pronto quando");
   - prova de que o `validate` confere de verdade: troquei temporariamente o nome da coluna `data_nascimento` na entidade e a aplicação **não subiu**, com `Schema validation: missing column [data_nasc_errada] in table [aluno]`. A alteração foi desfeita. Até este passo o `validate` não tinha nenhuma entidade para conferir, então "subir sem erro" ainda não provava nada.
-- Os testes com H2 não validam a migration do MySQL (o H2 cria o schema a partir da entidade, e o Flyway está desligado neles); a conferência contra o MySQL real é a subida acima. Um teste automático de repositório entra no Passo 24 do playbook.
+- Os testes com H2 não validam a migration do MySQL (o H2 cria o schema a partir da entidade, e o Flyway está desligado neles); a conferência contra o MySQL real é a subida acima. (Correção: eu tinha anotado aqui que um teste de repositório entraria no Passo 24 do playbook; o Passo 24 trata dos dados de teste e do Flyway desligado, não de teste de repositório.)
 
 ## 23. Trocar o mock pelo repository
 
@@ -383,9 +383,19 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Limite conhecido:** se dois pedidos com o mesmo e-mail chegarem ao mesmo tempo, os dois passam pela checagem e a restrição `UNIQUE` do banco recusa o segundo com `DataIntegrityViolationException`, que hoje cai no tratamento genérico (500). Dá para mapear para 409 no `GlobalExceptionHandler`; fica anotado.
 - **Efeito no deploy:** no primeiro deploy com o banco, o Flyway cria a tabela e aplica a `V2` no RDS (o RDS precisa estar `Available`). A coleção do Postman, com 10 alunos de exemplo, passa a responder 409 para os e-mails que já existem na carga.
 
+## 24. Testes rápidos com H2: dados de teste e Flyway desligado
+
+- **Status:** concluído (branch `feature/h2-dados-de-teste`)
+- Quase tudo o que o passo pede já tinha entrado nos passos 18, 21 e 23. O `src/test/resources/application.yml` completo ficou assim: `flyway.enabled: false` (passo 21), `jpa.hibernate.ddl-auto: create-drop`, `jpa.open-in-view: false`, `jpa.defer-datasource-initialization: true` (passo 23) e, **novo neste passo**, `spring.sql.init.mode: always`. Para banco embutido o `always` já é o padrão; ficou explícito para não depender disso.
+- `src/test/resources/data.sql` (passo 23): os 8 alunos, **sem informar o `id`** nos inserts. Com id explícito o H2 não avança a sequência e o próximo `POST` colide; sem id, o auto incremento segue de 9 em diante.
+- **`@DirtiesContext` não foi necessário.** Conferi os testes que alteram dados: eles só mexem em alunos que criam na hora (e-mail e nome únicos) ou no id inexistente `987654`; nenhum altera os alunos 1 a 8, e as listagens filtram por uma marca única. Como prova, rodei a suíte 3 vezes com `-Dsurefire.runOrder=random` (embaralha a ordem das **classes**; a ordem dos métodos dentro de cada classe é do JUnit): 68 testes passando nas 3. Se um teste futuro precisar alterar os alunos 1 a 8, aí sim usar `@DirtiesContext` (recria o contexto e restaura a carga).
+- **"`mvn test` passa sem nenhum banco ligado":** os testes usam o H2 em memória (sem `datasource` no arquivo de teste) e o Flyway desligado; o `DB_PASSWORD` e o MySQL não entram. A esteira do GitHub, que não tem MySQL nenhum, roda os 68 testes e passa em cada PR (`build` verde).
+- **Limite (lembrete do playbook):** como o Flyway fica desligado nos testes, as migrations **não são exercitadas** por eles. Cada migration nova precisa ser validada subindo a aplicação contra o MySQL local (passo 17), como fizemos com a `V1` e a `V2`. A conferência automática com MySQL real é o Passo 39 do playbook.
+- Correção de uma anotação minha: no passo 22 eu disse que um teste de repositório entraria no Passo 24; não é o caso. O Passo 24 é este (dados de teste e Flyway desligado).
+
 ## Próximos passos
 
-- Passo 24 do playbook (testes de repositório e `data.sql` de teste; o `data.sql` básico já existe desde o passo 23).
+- Próximo passo do playbook (a partir do 25).
 - Segunda release (com o banco): RDS `Available` antes do merge na `main`; o Flyway cria a tabela no RDS.
 - Seções 12 a 14 do tutorial (rotina, problemas comuns, limpeza).
 - Decidir sobre as sobras na AWS (`rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos`).

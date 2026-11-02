@@ -10,3 +10,7 @@ spring:
     hibernate:
       ddl-auto: create-drop
     open-in-view: false
+  sql:
+    init:
+      # roda o data.sql sempre (para banco embutido já é o padrão; explícito para não depender disso)
+      mode: always

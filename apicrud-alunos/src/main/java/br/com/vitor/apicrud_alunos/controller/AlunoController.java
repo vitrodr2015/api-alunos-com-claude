@@ -2,6 +2,7 @@ package br.com.vitor.apicrud_alunos.controller;
 
 import java.net.URI;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -47,10 +48,9 @@ public class AlunoController {
 	public PageResponse<AlunoResponse> listar(
 			@RequestParam(required = false) String nome,
 			@RequestParam(required = false) Boolean ativo,
-			@RequestParam(defaultValue = "0") int page,
-			@RequestParam(defaultValue = "10") int size,
-			@RequestParam(defaultValue = "id") String sort) {
-		return service.listar(nome, ativo, page, size, sort).map(mapper::toResponse);
+			Pageable pageable) {
+		// page, size e sort (ex.: sort=nome,desc) são lidos pelo Spring; padrão e máximo de size ficam no application.yml
+		return service.listar(nome, ativo, pageable).map(mapper::toResponse);
 	}
 
 	@GetMapping("/{id}")

@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
+import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -37,6 +38,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(InvalidRequestException.class)
 	public ResponseEntity<ErrorResponse> handleInvalidRequest(InvalidRequestException ex) {
 		return build(HttpStatus.BAD_REQUEST, ex.getMessage());
+	}
+
+	// ordenação por um campo que não existe na entidade (ex.: sort=senha)
+	@ExceptionHandler(PropertyReferenceException.class)
+	public ResponseEntity<ErrorResponse> handlePropertyReference(PropertyReferenceException ex) {
+		return build(HttpStatus.BAD_REQUEST,
+				"Não é possível ordenar por '" + ex.getPropertyName() + "': esse campo não existe");
 	}
 
 	@ExceptionHandler(ConflictException.class)

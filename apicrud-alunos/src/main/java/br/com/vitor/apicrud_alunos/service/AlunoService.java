@@ -1,12 +1,10 @@
 package br.com.vitor.apicrud_alunos.service;
 
-import java.util.Set;
-import java.util.TreeSet;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,14 +20,6 @@ import br.com.vitor.apicrud_alunos.repository.AlunoRepository;
 public class AlunoService {
 
 	private static final Logger log = LoggerFactory.getLogger(AlunoService.class);
-
-	private static final int TAMANHO_MAXIMO_PAGINA = 100;
-
-	// campos pelos quais a lista pode ser ordenada (nomes das propriedades da entidade)
-	private static final Set<String> CAMPOS_ORDENAVEIS = Set.of("id", "nome", "email", "dataNascimento");
-
-	// ordenar por texto sem diferenciar maiúsculas de minúsculas
-	private static final Set<String> CAMPOS_DE_TEXTO = Set.of("nome", "email");
 
 	private final AlunoRepository repository;
 
@@ -48,18 +38,17 @@ public class AlunoService {
 	}
 
 	@Transactional(readOnly = true)
-	public PageResponse<Aluno> listar(String nome, Boolean ativo, int page, int size, String sort) {
-		if (page < 0) {
-			throw new InvalidRequestException("O parâmetro page deve ser maior ou igual a 0");
-		}
-		if (size < 1 || size > TAMANHO_MAXIMO_PAGINA) {
-			throw new InvalidRequestException("O parâmetro size deve estar entre 1 e " + TAMANHO_MAXIMO_PAGINA);
-		}
-		Sort ordenacao = ordenacao(sort);
+	// page, size e sort chegam já resolvidos pelo Spring (padrão e máximo vêm do application.yml);
+	// ordenar por um campo que não existe lança PropertyReferenceException, tratada como 400
+	public PageResponse<Aluno> listar(String nome, Boolean ativo, Pageable pageable) {
 		String filtroNome = nome == null ? "" : nome.trim();
+		Pageable ordenado = comDesempatePeloId(pageable);
 
-		Page<Aluno> pagina = repository.buscar(filtroNome, ativo, PageRequest.of(page, size, ordenacao));
-		return new PageResponse<>(pagina.getContent(), page, size, pagina.getTotalElements(), pagina.getTotalPages());
+		Page<Aluno> pagina = ativo == null
+				? repository.findByNomeContainingIgnoreCase(filtroNome, ordenado)
+				: repository.findByNomeContainingIgnoreCaseAndAtivo(filtroNome, ativo, ordenado);
+		return new PageResponse<>(pagina.getContent(), pagina.getNumber(), pagina.getSize(),
+				pagina.getTotalElements(), pagina.getTotalPages());
 	}
 
 	@Transactional(readOnly = true)
@@ -121,27 +110,15 @@ public class AlunoService {
 		}
 	}
 
-	// sort no formato "campo" ou "campo,asc|desc"; o id desempata, para a paginação ser estável
-	private Sort ordenacao(String sort) {
-		String[] partes = sort.split(",");
-		String campo = partes[0].trim();
-		if (!CAMPOS_ORDENAVEIS.contains(campo)) {
-			throw new InvalidRequestException("Não é possível ordenar por '" + campo
-					+ "'. Campos aceitos: " + String.join(", ", new TreeSet<>(CAMPOS_ORDENAVEIS)));
+	// o id desempata a ordenação (e é a ordem padrão), para a paginação ser estável entre as páginas
+	private Pageable comDesempatePeloId(Pageable pageable) {
+		Sort sort = pageable.getSort();
+		if (sort.isUnsorted()) {
+			sort = Sort.by("id");
+		} else if (sort.getOrderFor("id") == null) {
+			sort = sort.and(Sort.by("id"));
 		}
-		Sort.Direction direcao;
-		if (partes.length == 1 || partes[1].trim().equalsIgnoreCase("asc")) {
-			direcao = Sort.Direction.ASC;
-		} else if (partes.length == 2 && partes[1].trim().equalsIgnoreCase("desc")) {
-			direcao = Sort.Direction.DESC;
-		} else {
-			throw new InvalidRequestException("O parâmetro sort deve ter o formato campo ou campo,asc ou campo,desc");
-		}
-		Sort.Order ordem = new Sort.Order(direcao, campo);
-		if (CAMPOS_DE_TEXTO.contains(campo)) {
-			ordem = ordem.ignoreCase();
-		}
-		return campo.equals("id") ? Sort.by(ordem) : Sort.by(ordem, Sort.Order.asc("id"));
+		return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
 	}
 
 }

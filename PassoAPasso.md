@@ -95,6 +95,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - Ordem de validação: corpo (400), id (400), existência (404), conflito (409), alteração.
 - Erros sempre no formato `ErrorResponse` (passo 4).
 - Fora do contrato por enquanto: `PATCH` parcial genérico em `/alunos/{id}`.
+- **Atualizado no passo 26:** os limites de paginação deste contrato (`size` padrão 10, faixa de 1 a 100, 400 fora dela) mudaram; a regra vigente está no passo 26.
 
 ## 6. Implementação dos 7 endpoints
 
@@ -407,6 +408,43 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - A numeração do `AUTO_INCREMENT` no RDS segue em 9, como no banco local.
 - Lembretes: o IP muda a cada tarefa; os dados agora ficam no RDS e sobrevivem à troca de tarefa; o RDS parado derruba a aplicação ao subir. Ao terminar, *Desired tasks* = 0 e parar o RDS.
 - **Ambiente desligado em 2026-11-02:** Service em Desired tasks = 0 (conferido pela CLI) e RDS `Stopped temporarily` (confirmado pelo usuário no console). O RDS religa sozinho em 7 dias.
+
+## 26. Paginação com `Pageable` (passo 25 do playbook)
+
+- **Status:** concluído (branch `feature/paginacao`)
+- **O que mudou:** a listagem deixou de ler `page`, `size` e `sort` como parâmetros próprios com validação à mão e passou a receber um `Pageable`, que o Spring resolve. O controller só recebe `Pageable pageable`; o `AlunoService.listar(nome, ativo, pageable)` escolhe a consulta e acrescenta o `id` como desempate (e como ordem padrão), para a paginação ser estável entre páginas.
+- **Limites no `application.yml`:** `spring.data.web.pageable.default-page-size: 20` e `max-page-size: 50`. O `application.yml` **de teste substitui o principal**, então os mesmos dois valores foram repetidos nele (o playbook já avisa desse cuidado).
+- **Repository:** as consultas passaram a ser derivadas, `findByNomeContainingIgnoreCase` e `findByNomeContainingIgnoreCaseAndAtivo` (o `@Query` com `locate` do passo 23 saiu). O Spring Data já escapa `%` e `_`, então `nome=%` procura o texto `%` e não vira curinga.
+- **Ordenação inválida = 400:** `GlobalExceptionHandler` trata `PropertyReferenceException` e devolve o `ErrorResponse` com 400, ex.: `Não é possível ordenar por 'senha': esse campo não existe`. **Diferença de versão:** no Spring Data 4 (Boot 4) a classe é `org.springframework.data.core.PropertyReferenceException`; o pacote antigo `org.springframework.data.mapping` não existe mais e quebra o contexto inteiro (`NoClassDefFoundError`). No meu primeiro `mvn test` eu filtrei a saída e deixei passar o erro de compilação; só a leitura do relatório do surefire mostrou a causa.
+- **O contrato do passo 5 mudou (decisão do playbook):**
+
+  | Antes (contrato do passo 5) | Agora |
+  | --- | --- |
+  | `size` padrão 10; faixa de 1 a 100 | `size` padrão **20**; máximo **50** |
+  | `size` acima de 100 → 400 | `size` acima de 50 → **reduzido para 50** (200) |
+  | `page=-1`, `size=0`, `page=abc` → 400 | caem nos padrões do Spring: `page` 0 e `size` 20 (200) |
+  | `sort` só por `id`, `nome`, `email`, `dataNascimento` | `sort` por **qualquer campo** do aluno (inclui `ativo`); campo inexistente → 400 |
+  | `nome` e `email` ordenavam sem diferenciar maiúsculas de minúsculas à força | segue a collation do banco (no MySQL `utf8mb4_unicode_ci` já ignora a caixa; no H2 dos testes não) |
+
+  O `size` devolvido na resposta é o **efetivo** (já reduzido).
+- **Testes:** 74 passando. No service (Mockito) saíram os testes de validação de página e entraram os de escolha da consulta e do desempate pelo `id`. No controller, o teste "parâmetros inválidos → 400" foi dividido: ordenação por campo inexistente → 400, filtro `ativo=talvez` → 400, e novos para padrão 20, `size=500` → 50, `page`/`size` fora da faixa → padrões e ordenação por `dataNascimento,desc` e por `ativo`.
+- **Verificado no MySQL local** (2026-11-02): sem parâmetros → `page` 0, `size` 20; `size=500` → 50; `size=3&page=2&sort=nome,desc` → página certa; `sort=senha` → 400 com a mensagem acima; `page=-1`, `size=0` e `page=abc` → 200 nos padrões; `nome=SOUZA` → 1; `nome=%` → 0.
+- **Postman:** o item "400 - Listar com size 101" esperava 400 e passaria a falhar; virou "200 - Listar com size 101 (não é erro: é reduzido para 50)" e confere `size` = 50. Ele continua na pasta "2 - Erros esperados", só com o nome avisando. A descrição do item de listagem foi atualizada. A coleção continua JSON válido.
+- **Ainda não está na produção:** a mudança de contrato só chega à AWS na próxima release (a API da 1.1.0 continua com o contrato antigo).
+
+## 27. Massa de teste: 400 alunos para a paginação
+
+- **Status:** concluído (na mesma branch do passo 26, `feature/paginacao`)
+- **Para quê:** com 8 alunos não dá para ver a paginação trabalhando (tudo cabe em uma página). Foram gerados **400 alunos** determinísticos: 20 primeiros nomes × 20 sobrenomes (400 nomes completos distintos), e-mail único com o número da linha (ex.: `adriana.almeida001@escola.com`), datas de nascimento entre 1990 e 2007 e **1 em cada 10 inativo (40)**, para testar também o filtro `ativo`. O gerador é um script Node curto, sem aleatoriedade (rodar de novo produz exatamente o mesmo SQL), com lotes de 100 linhas por `INSERT`; ele conferiu 400 nomes distintos, 400 e-mails distintos e 40 inativos.
+- **Onde ficou:**
+  - `src/main/resources/db/migration/V3__insert_400_alunos_para_paginacao.sql` (MySQL; a `V1` e a `V2` não foram tocadas);
+  - o mesmo conteúdo no fim de `src/test/resources/data.sql` (H2 dos testes). Sem `id` explícito nos dois, como no passo 24.
+- **Testes novos** (`AlunoControllerTests`, seis): total e número de páginas com `size=20`; páginas seguidas sem repetir nem pular alunos (ids 1–50, 51–100 e o início da página 9); `size=500` devolve no máximo 50 itens; página além do fim devolve lista vazia com o total correto; filtro `ativo=false` pagina só os inativos; filtro por nome com ordenação e página pequena. Como outros testes criam e desativam alunos no mesmo banco, os totais são comparados com "pelo menos". Suíte: **80 testes** passando, inclusive em ordem aleatória de classes.
+- **Verificado no MySQL local** (2026-11-02): ao subir, o Flyway aplicou a `V3`; no banco ficaram 408 alunos (40 inativos). Pela API: padrão `size` 20 → 21 páginas; `page=20` tem 8 itens (408 = 20×20 + 8); `page=21` devolve lista vazia com `totalElements` 408; `size=500` → 50 itens; `ativo=false` → 40; `nome=adriana&sort=nome,desc` → 20 resultados em ordem decrescente; `sort=dataNascimento,desc` → datas decrescentes; `sort=senha` → 400.
+- **Detalhe do banco local:** o id mais alto é 409 (não 408), porque o id 9 foi o aluno de teste apagado no passo 23. Por isso a página 0 de `size=50` termina no id 51 e a página 1 começa no 52. Está correto: nenhum aluno repetido ou pulado.
+- **Bateria completa depois da paginação** (2026-11-02, MySQL local, por curl): 28 verificações, todas conforme o contrato, e o banco terminou com os mesmos 408 alunos. Cobriu: `GET` lista, por id, inexistente (404), id `0` e `abc` (400); `POST` 201 com `Location`, e-mail repetido com outra caixa (409), campos inválidos, data futura e corpo ilegível (400), `Content-Type` não aceito (415); `PUT` 200, e-mail de outro aluno (409) e inexistente (404); `PATCH disable`/`enable` (idempotentes, 404 se não existe); `DELETE` 204 e depois 404, id inválido (400); método não permitido (405) e `Accept` inexistente (406); formatos JSON, XML e YAML; `sort` inexistente e `ativo=talvez` (400) e `size=500` (200, reduzido). O aluno criado na bateria (id 410) foi apagado pela própria rota, então o próximo id local será 411.
+- **Não executado:** a coleção do Postman em si (só foi validada como JSON e teve o item do `size=101` ajustado); a bateria acima foi por curl.
+- **Atenção ao levar para a AWS:** a `V3` é uma migration como qualquer outra. Na **próxima release**, o Flyway vai aplicá-la no RDS e inserir os 400 alunos lá também. Em projeto real, dados de exemplo não vão para produção; aqui é aceitável por ser estudo, mas é uma decisão a tomar **antes** de fazer a release: depois de aplicada, a `V3` não pode ser editada (só desfeita por uma `V4` que apague as linhas).
 
 ## Próximos passos
 

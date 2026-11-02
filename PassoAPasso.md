@@ -480,10 +480,27 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Postman:** os scripts da listagem passaram a esperar `_embedded`, `_links` e `page` (e `page.size` no item do `size=101`); a descrição do item de listagem menciona o HAL. JSON da coleção válido; a coleção em si não foi executada no Postman.
 - **Ainda não está na produção:** a API da AWS (release 1.1.0) continua no contrato antigo.
 
+## 29. Release 1.2.0: paginação, HATEOAS e 400 alunos na AWS
+
+- **Status:** concluído (2026-11-02); deploy `success`, API nova respondendo na AWS
+- **O que a release leva** (passos 26 a 28 mais a documentação): paginação com `Pageable` (padrão 20, máximo 50, `sort` inválido → 400), HAL (HATEOAS) na listagem e no `GET /alunos/{id}`, a migration `V3` com 400 alunos de exemplo e os `.md` atualizados. 9 commits sem contar os merges.
+- **Ciclo, como foi feito:**
+  1. PR #23 `feature/hateoas` → `develop` (merge commit `168aa44`, `build` verde).
+  2. `release/1.2.0` cortada da `develop`; PR #24 `release/1.2.0` → `main`, `build` verde (88 testes).
+  3. Antes do merge: o usuário confirmou RDS `Available`, Service com *Desired tasks* = 1 e a aceitação da `V3` (400 alunos no RDS). Conferi a única parte que a CLI enxerga: Service `ACTIVE`, 1 tarefa rodando na `:6`. Como a 1.1.0 exige o banco para subir, uma tarefa de pé também indica o RDS no ar.
+  4. Merge com *merge commit* (`0d29d8e`) → a esteira rodou e terminou com `success`.
+  5. Tag anotada `v1.2.0` em `0d29d8e`.
+  6. PR #25 `main` → `develop` (merge commit `74cfbde`), para a `develop` receber a release.
+- **Conferido na AWS** (CLI, perfil `crud-alunos`): Service `ACTIVE`, 1 tarefa `RUNNING`, deploy `COMPLETED`, Task Definition **`crud-alunos-task-definition:7`**; IP público novo em `<IP-publico>` (muda a cada tarefa).
+- **Teste da API na AWS:** a lista responde em HAL com `page` = `{number 0, size 20, totalElements 408, totalPages 21}`; `_embedded.alunos`, links `first`, `self`, `next` e `last` com o IP da tarefa; `GET /alunos/8` devolve a Helena em HAL com o link `disable`; `ativo=false` → 40 inativos; `size=500` → reduzido para 50; `sort=senha` → 400 com a mensagem em português; `Accept: application/xml` na lista → 406; id inexistente → 404. Ou seja: o Flyway aplicou a `V3` no RDS (408 alunos = 8 + 400) e o contrato novo está em produção.
+- **Primeira mudança de contrato em produção:** quem usava a API da 1.1.0 (`content`, `totalElements` na raiz; XML/YAML nos `GET`) passa a ver o formato do passo 28. Como é projeto de estudo, não há cliente real.
+- **Os dados de exemplo agora estão no RDS.** Para remover, só com uma migration nova (`V4`) que apague as linhas; a `V3` não se edita.
+- **Sobra para limpar:** a branch remota `release/1.2.0` (o sistema bloqueou o apagamento porque não foi pedido; é só pedir).
+
 ## Próximos passos
 
 - Continuar o playbook: o usuário cola o próximo passo (a numeração do playbook é diferente da nossa).
 - ~~Segunda release (com o banco)~~ (feita, passo 25).
 - Seções 12 a 14 do tutorial da AWS (rotina, problemas comuns, limpeza).
-- Ambiente da AWS desligado em 2026-11-02 (Desired tasks = 0 e RDS Stopped temporarily). O RDS parado religa sozinho em 7 dias (por volta de 2026-11-09). Decidir se apaga a branch `teste-ci-quebrado`.
+- **Ambiente da AWS LIGADO** desde a release 1.2.0 (2026-11-02): RDS Available e Service com 1 tarefa. Ao terminar: Desired tasks = 0 e RDS Stopped temporarily (que religa sozinho em 7 dias). Decidir se apaga a branch `teste-ci-quebrado` e a remota `release/1.2.0`.
 - Decidir sobre as sobras na AWS (`rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos`).

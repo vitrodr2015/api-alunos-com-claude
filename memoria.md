@@ -9,6 +9,7 @@ Arquivo para retomar o contexto se a conversa for perdida. Ler junto com `PassoA
 - O usuário segue um playbook com passos numerados e cola o trecho de cada passo na conversa.
 - Respostas em português. O usuário é iniciante em Spring, então explicar o que cada coisa é.
 - Commit, push, PR e merge só quando o usuário pedir (ou quando o pedido já os incluir). Com o Git Flow, tudo vai por branch e PR; nunca push direto em `main`, `develop` ou `release/*`.
+- **Por que os `.md` são tão importantes (dito pelo usuário em 2026-11-02):** o `PassoAPasso.md`, o `Duvida-CICD.md` e este arquivo são a matéria-prima de um **playbook atualizado** que será montado no final. Por isso precisam estar sempre em dia e em formato de passo a passo: ordem cronológica, o que foi feito, comandos e arquivos usados, o que deu errado e como se resolveu, diferenças em relação ao playbook/tutorial original, e a prova de que funcionou (resultado de teste, saída real). Quem lê no futuro deve conseguir reproduzir sem a conversa.
 - **Regra de manutenção dos `.md`:** a cada passo, mudança de configuração ou diferença na AWS, atualizar no mesmo PR o `PassoAPasso.md` (sempre), o `Duvida-CICD.md` (quando mexer na AWS ou no CI/CD, inclusive efeitos de código sobre a AWS) e este arquivo (estado e pendências). Reler as seções "Estado" e "Pendências" para tirar o que ficou velho.
 
 ## Projeto

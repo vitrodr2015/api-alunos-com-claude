@@ -69,13 +69,14 @@ Arquivo para retomar o contexto se a conversa for perdida. Ler junto com `PassoA
 - Passo 21 feito: Flyway (`spring-boot-starter-flyway` + `flyway-mysql`; no Boot 4 o `flyway-core` sozinho não autoconfigura), migration `V1__create_table_aluno.sql`, `ddl-auto: validate`, Flyway desligado nos testes (H2). Sem seed ainda: os 8 alunos fixos seguem em memória; ao migrar o service para o banco, criar `V2__...` (nunca editar a `V1`). No primeiro deploy, o Flyway cria a tabela no RDS.
 - Passo 22 feito: `Aluno` é `@Entity` e existe `AlunoRepository`. `ddl-auto: validate` foi provado de verdade (coluna errada derrubou a subida). Próximo: trocar o service pelo repository e criar a `V2__...` com os 8 alunos fixos.
 - Passo 23 feito: `AlunoService` usa o `AlunoRepository` (construtor, `@Transactional`, mesmas regras e exceções); carga inicial na `V2__insert_alunos_iniciais.sql` (MySQL) e em `src/test/resources/data.sql` (H2, sem id explícito para a sequência não colidir); `AlunoServiceTests` com Mockito (16). Total: 68 testes. Verificado no `mysql-dev` com curl (próximo id local: 10). Limite conhecido: e-mail duplicado em pedidos simultâneos vira `DataIntegrityViolationException` (500), ainda sem mapeamento para 409. A coleção do Postman responde 409 para e-mails que já estão na carga.
+- Passo 24 feito: `sql.init.mode: always` explícito no `application.yml` de teste; `@DirtiesContext` não foi preciso (testes não mexem nos alunos 1 a 8; prova: 3 rodadas com `-Dsurefire.runOrder=random`, 68 ok). Os testes não exercitam as migrations (Flyway desligado): validar cada migration nova subindo a aplicação no `mysql-dev`. Eu havia dito antes que o Passo 24 trazia teste de repositório; estava errado.
 - **Cuidado ao fazer release:** com o datasource, a aplicação real exige o banco no arranque. Antes do merge na `main` (deploy), o RDS `database-crud-alunos` tem de estar `Available`; se estiver parado, a tarefa cai ao subir.
 
 ## Pendências
 
 - Decidir o destino do `HELP.md`.
 - Escolher MapStruct ou Dozer, se o usuário quiser trocar o mapper manual.
-- Passo 24 do playbook (testes de repositório; o `data.sql` básico de teste já existe).
+- Próximo passo do playbook (a partir do 25).
 - Fazer uma release com o banco (2ª release): RDS `Available` antes do merge na `main`.
 - Seções 12 a 14 do tutorial da AWS (rotina, problemas comuns, limpeza) ainda não executadas.
 - Sobras na AWS para decidir: `rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos` (sem o "i") e a política `LerSecretDB_CrudAlunos` que ficou na role errada.

@@ -1,6 +1,7 @@
 package br.com.vitor.apicrud_alunos.controller;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -251,6 +252,64 @@ class AlunoControllerTests {
 				.andExpect(jsonPath("$.size").value(2))
 				.andExpect(jsonPath("$.content.length()").value(2));
 		mockMvc.perform(get("/alunos").param("sort", "ativo")).andExpect(status().isOk());
+	}
+
+	// ---------- paginação com volume (os 400 alunos do data.sql, ids 9 a 408) ----------
+	// Outros testes criam e desativam alunos no mesmo banco, então os totais são comparados com "pelo menos".
+
+	@Test
+	void paginacaoComVolumeCalculaTotalEPaginas() throws Exception {
+		mockMvc.perform(get("/alunos").param("size", "20"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.content.length()").value(20))
+				.andExpect(jsonPath("$.totalElements").value(greaterThanOrEqualTo(408)))
+				.andExpect(jsonPath("$.totalPages").value(greaterThanOrEqualTo(21)));
+	}
+
+	@Test
+	void paginasSeguidasSaoSequenciaisSemRepetirNemPularAlunos() throws Exception {
+		mockMvc.perform(get("/alunos").param("size", "50").param("page", "0"))
+				.andExpect(jsonPath("$.content[0].id").value(1))
+				.andExpect(jsonPath("$.content[49].id").value(50));
+		mockMvc.perform(get("/alunos").param("size", "50").param("page", "1"))
+				.andExpect(jsonPath("$.content[0].id").value(51))
+				.andExpect(jsonPath("$.content[49].id").value(100));
+		mockMvc.perform(get("/alunos").param("size", "50").param("page", "8"))
+				.andExpect(jsonPath("$.content[0].id").value(401));
+	}
+
+	@Test
+	void sizeAcimaDoMaximoDevolveNoMaximoCinquentaItens() throws Exception {
+		mockMvc.perform(get("/alunos").param("size", "500"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.size").value(50))
+				.andExpect(jsonPath("$.content.length()").value(50));
+	}
+
+	@Test
+	void paginaAlemDoFimDevolveListaVaziaComOTotalCorreto() throws Exception {
+		mockMvc.perform(get("/alunos").param("size", "50").param("page", "1000"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.content.length()").value(0))
+				.andExpect(jsonPath("$.totalElements").value(greaterThanOrEqualTo(408)));
+	}
+
+	@Test
+	void filtroPorAtivoFalsoPaginaSoOsInativosDosDadosDeTeste() throws Exception {
+		// 1 em cada 10 dos 400 alunos de teste é inativo (40); outros testes podem desativar mais
+		mockMvc.perform(get("/alunos").param("ativo", "false").param("size", "50"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.totalElements").value(greaterThanOrEqualTo(40)))
+				.andExpect(jsonPath("$.content[0].ativo").value(false));
+	}
+
+	@Test
+	void filtroPorNomeEncontraUmNomeGeradoEPagina() throws Exception {
+		mockMvc.perform(get("/alunos").param("nome", "ADRIANA").param("sort", "nome,asc").param("size", "5"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.size").value(5))
+				.andExpect(jsonPath("$.content[0].nome").value(containsString("Adriana")))
+				.andExpect(jsonPath("$.totalElements").value(greaterThanOrEqualTo(20)));
 	}
 
 	// ---------- PUT /alunos/{id} ----------

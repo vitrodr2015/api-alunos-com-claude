@@ -432,6 +432,18 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Postman:** o item "400 - Listar com size 101" esperava 400 e passaria a falhar; virou "200 - Listar com size 101 (não é erro: é reduzido para 50)" e confere `size` = 50. Ele continua na pasta "2 - Erros esperados", só com o nome avisando. A descrição do item de listagem foi atualizada. A coleção continua JSON válido.
 - **Ainda não está na produção:** a mudança de contrato só chega à AWS na próxima release (a API da 1.1.0 continua com o contrato antigo).
 
+## 27. Massa de teste: 400 alunos para a paginação
+
+- **Status:** concluído (na mesma branch do passo 26, `feature/paginacao`)
+- **Para quê:** com 8 alunos não dá para ver a paginação trabalhando (tudo cabe em uma página). Foram gerados **400 alunos** determinísticos: 20 primeiros nomes × 20 sobrenomes (400 nomes completos distintos), e-mail único com o número da linha (ex.: `adriana.almeida001@escola.com`), datas de nascimento entre 1990 e 2007 e **1 em cada 10 inativo (40)**, para testar também o filtro `ativo`. O gerador é um script Node curto, sem aleatoriedade (rodar de novo produz exatamente o mesmo SQL), com lotes de 100 linhas por `INSERT`; ele conferiu 400 nomes distintos, 400 e-mails distintos e 40 inativos.
+- **Onde ficou:**
+  - `src/main/resources/db/migration/V3__insert_400_alunos_para_paginacao.sql` (MySQL; a `V1` e a `V2` não foram tocadas);
+  - o mesmo conteúdo no fim de `src/test/resources/data.sql` (H2 dos testes). Sem `id` explícito nos dois, como no passo 24.
+- **Testes novos** (`AlunoControllerTests`, seis): total e número de páginas com `size=20`; páginas seguidas sem repetir nem pular alunos (ids 1–50, 51–100 e o início da página 9); `size=500` devolve no máximo 50 itens; página além do fim devolve lista vazia com o total correto; filtro `ativo=false` pagina só os inativos; filtro por nome com ordenação e página pequena. Como outros testes criam e desativam alunos no mesmo banco, os totais são comparados com "pelo menos". Suíte: **80 testes** passando, inclusive em ordem aleatória de classes.
+- **Verificado no MySQL local** (2026-11-02): ao subir, o Flyway aplicou a `V3`; no banco ficaram 408 alunos (40 inativos). Pela API: padrão `size` 20 → 21 páginas; `page=20` tem 8 itens (408 = 20×20 + 8); `page=21` devolve lista vazia com `totalElements` 408; `size=500` → 50 itens; `ativo=false` → 40; `nome=adriana&sort=nome,desc` → 20 resultados em ordem decrescente; `sort=dataNascimento,desc` → datas decrescentes; `sort=senha` → 400.
+- **Detalhe do banco local:** o id mais alto é 409 (não 408), porque o id 9 foi o aluno de teste apagado no passo 23. Por isso a página 0 de `size=50` termina no id 51 e a página 1 começa no 52. Está correto: nenhum aluno repetido ou pulado.
+- **Atenção ao levar para a AWS:** a `V3` é uma migration como qualquer outra. Na **próxima release**, o Flyway vai aplicá-la no RDS e inserir os 400 alunos lá também. Em projeto real, dados de exemplo não vão para produção; aqui é aceitável por ser estudo, mas é uma decisão a tomar **antes** de fazer a release: depois de aplicada, a `V3` não pode ser editada (só desfeita por uma `V4` que apague as linhas).
+
 ## Próximos passos
 
 - Continuar o playbook: o usuário cola o próximo passo (a numeração do playbook é diferente da nossa).

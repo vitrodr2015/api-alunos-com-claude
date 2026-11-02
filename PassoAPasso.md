@@ -95,6 +95,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - Ordem de validação: corpo (400), id (400), existência (404), conflito (409), alteração.
 - Erros sempre no formato `ErrorResponse` (passo 4).
 - Fora do contrato por enquanto: `PATCH` parcial genérico em `/alunos/{id}`.
+- **Atualizado nos passos 26 e 28:** os limites de paginação deste contrato (`size` padrão 10, faixa de 1 a 100, 400 fora dela) mudaram (passo 26) e a listagem e o `GET` por id passaram a responder em HAL (passo 28); a regra vigente está nesses passos.
 
 ## 6. Implementação dos 7 endpoints
 
@@ -279,7 +280,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
   5. Tag anotada `v1.0.0` no commit `7e10a2f`.
   6. PR #6 `main` → `develop`, para a `develop` receber o merge commit da release.
 - A `release/1.0.0` foi usada como acumulador (ideia do usuário): o PR #5 ficou aberto enquanto mais PRs podiam entrar na release, e o deploy só aconteceu no merge. No Git Flow clássico a release só recebe correções e as features novas esperam a próxima; fica como segundo exercício.
-- Pendente: apagar no GitHub as branches já mescladas (`release/1.0.0`, `feature/ci-gitflow`, `feature/aluno-8`, `ci-permissions`, `teste-ci-quebrado`). O sistema bloqueou `git push origin --delete`, então é pelo botão **Delete branch**.
+- As branches já mescladas foram apagadas do GitHub em 2026-11-02 (15 branches, pela API `gh api -X DELETE .../git/refs/heads/<nome>`, a pedido do usuário). Ficaram `main`, `develop` e `teste-ci-quebrado` (nunca mesclada, de propósito). As tags `v1.0.0` e `v1.1.0` continuam.
 
 ## 17. Banco de dados local (MySQL em Docker)
 
@@ -393,9 +394,96 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Limite (lembrete do playbook):** como o Flyway fica desligado nos testes, as migrations **não são exercitadas** por eles. Cada migration nova precisa ser validada subindo a aplicação contra o MySQL local (passo 17), como fizemos com a `V1` e a `V2`. A conferência automática com MySQL real é o Passo 39 do playbook.
 - Correção de uma anotação minha: no passo 22 eu disse que um teste de repositório entraria no Passo 24; não é o caso. O Passo 24 é este (dados de teste e Flyway desligado).
 
+## 25. Release 1.1.0: a aplicação usa o MySQL na AWS
+
+- **Status:** concluído (2026-11-02); deploy `success`, aplicação respondendo na AWS lendo do RDS
+- Ciclo, como foi feito:
+  1. `release/1.1.0` criada a partir da `develop` (12 commits, 17 arquivos: passos 17 a 24).
+  2. PR #16 `release/1.1.0` → `main`, com o `build` verde (68 testes). Antes do merge o usuário confirmou o RDS `Available` e o Service com *Desired tasks* = 1.
+  3. Merge com *merge commit* (`dd7d051`) → a esteira rodou e o deploy terminou com `success`.
+  4. Tag anotada `v1.1.0` em `dd7d051`.
+  5. PR #17 `main` → `develop` (merge commit `e9cd5ed`), para a `develop` receber a release.
+- **Conferido na AWS** (pela AWS CLI, perfil `crud-alunos`): Service `ACTIVE`, 1 tarefa `RUNNING`, deploy `COMPLETED`, Task Definition **`crud-alunos-task-definition:6`**. (Eu havia previsto a `:3`; a numeração é maior porque cada deploy da `main` registra uma revisão nova.)
+- **Teste da API na AWS** (IP público da tarefa, porta 8080): `GET /alunos` devolveu 8 alunos (`totalElements` 8); `GET /alunos/8` devolveu Helena Barros; id inexistente deu 404. Ou seja, o Flyway rodou no RDS (tabela `aluno` e `V2`) e a aplicação conectou com a senha do Secrets Manager. Era o primeiro teste real da aplicação com o banco na nuvem.
+- A numeração do `AUTO_INCREMENT` no RDS segue em 9, como no banco local.
+- Lembretes: o IP muda a cada tarefa; os dados agora ficam no RDS e sobrevivem à troca de tarefa; o RDS parado derruba a aplicação ao subir. Ao terminar, *Desired tasks* = 0 e parar o RDS.
+- **Ambiente desligado em 2026-11-02:** Service em Desired tasks = 0 (conferido pela CLI) e RDS `Stopped temporarily` (confirmado pelo usuário no console). O RDS religa sozinho em 7 dias.
+
+## 26. Paginação com `Pageable` (passo 25 do playbook)
+
+- **Status:** concluído (branch `feature/paginacao`)
+- **O que mudou:** a listagem deixou de ler `page`, `size` e `sort` como parâmetros próprios com validação à mão e passou a receber um `Pageable`, que o Spring resolve. O controller só recebe `Pageable pageable`; o `AlunoService.listar(nome, ativo, pageable)` escolhe a consulta e acrescenta o `id` como desempate (e como ordem padrão), para a paginação ser estável entre páginas.
+- **Limites no `application.yml`:** `spring.data.web.pageable.default-page-size: 20` e `max-page-size: 50`. O `application.yml` **de teste substitui o principal**, então os mesmos dois valores foram repetidos nele (o playbook já avisa desse cuidado).
+- **Repository:** as consultas passaram a ser derivadas, `findByNomeContainingIgnoreCase` e `findByNomeContainingIgnoreCaseAndAtivo` (o `@Query` com `locate` do passo 23 saiu). O Spring Data já escapa `%` e `_`, então `nome=%` procura o texto `%` e não vira curinga.
+- **Ordenação inválida = 400:** `GlobalExceptionHandler` trata `PropertyReferenceException` e devolve o `ErrorResponse` com 400, ex.: `Não é possível ordenar por 'senha': esse campo não existe`. **Diferença de versão:** no Spring Data 4 (Boot 4) a classe é `org.springframework.data.core.PropertyReferenceException`; o pacote antigo `org.springframework.data.mapping` não existe mais e quebra o contexto inteiro (`NoClassDefFoundError`). No meu primeiro `mvn test` eu filtrei a saída e deixei passar o erro de compilação; só a leitura do relatório do surefire mostrou a causa.
+- **O contrato do passo 5 mudou (decisão do playbook):**
+
+  | Antes (contrato do passo 5) | Agora |
+  | --- | --- |
+  | `size` padrão 10; faixa de 1 a 100 | `size` padrão **20**; máximo **50** |
+  | `size` acima de 100 → 400 | `size` acima de 50 → **reduzido para 50** (200) |
+  | `page=-1`, `size=0`, `page=abc` → 400 | caem nos padrões do Spring: `page` 0 e `size` 20 (200) |
+  | `sort` só por `id`, `nome`, `email`, `dataNascimento` | `sort` por **qualquer campo** do aluno (inclui `ativo`); campo inexistente → 400 |
+  | `nome` e `email` ordenavam sem diferenciar maiúsculas de minúsculas à força | segue a collation do banco (no MySQL `utf8mb4_unicode_ci` já ignora a caixa; no H2 dos testes não) |
+
+  O `size` devolvido na resposta é o **efetivo** (já reduzido).
+- **Testes:** 74 passando. No service (Mockito) saíram os testes de validação de página e entraram os de escolha da consulta e do desempate pelo `id`. No controller, o teste "parâmetros inválidos → 400" foi dividido: ordenação por campo inexistente → 400, filtro `ativo=talvez` → 400, e novos para padrão 20, `size=500` → 50, `page`/`size` fora da faixa → padrões e ordenação por `dataNascimento,desc` e por `ativo`.
+- **Verificado no MySQL local** (2026-11-02): sem parâmetros → `page` 0, `size` 20; `size=500` → 50; `size=3&page=2&sort=nome,desc` → página certa; `sort=senha` → 400 com a mensagem acima; `page=-1`, `size=0` e `page=abc` → 200 nos padrões; `nome=SOUZA` → 1; `nome=%` → 0.
+- **Postman:** o item "400 - Listar com size 101" esperava 400 e passaria a falhar; virou "200 - Listar com size 101 (não é erro: é reduzido para 50)" e confere `size` = 50. Ele continua na pasta "2 - Erros esperados", só com o nome avisando. A descrição do item de listagem foi atualizada. A coleção continua JSON válido.
+- **Ainda não está na produção:** a mudança de contrato só chega à AWS na próxima release (a API da 1.1.0 continua com o contrato antigo).
+
+## 27. Massa de teste: 400 alunos para a paginação
+
+- **Status:** concluído (na mesma branch do passo 26, `feature/paginacao`)
+- **Para quê:** com 8 alunos não dá para ver a paginação trabalhando (tudo cabe em uma página). Foram gerados **400 alunos** determinísticos: 20 primeiros nomes × 20 sobrenomes (400 nomes completos distintos), e-mail único com o número da linha (ex.: `adriana.almeida001@escola.com`), datas de nascimento entre 1990 e 2007 e **1 em cada 10 inativo (40)**, para testar também o filtro `ativo`. O gerador é um script Node curto, sem aleatoriedade (rodar de novo produz exatamente o mesmo SQL), com lotes de 100 linhas por `INSERT`; ele conferiu 400 nomes distintos, 400 e-mails distintos e 40 inativos.
+- **Onde ficou:**
+  - `src/main/resources/db/migration/V3__insert_400_alunos_para_paginacao.sql` (MySQL; a `V1` e a `V2` não foram tocadas);
+  - o mesmo conteúdo no fim de `src/test/resources/data.sql` (H2 dos testes). Sem `id` explícito nos dois, como no passo 24.
+- **Testes novos** (`AlunoControllerTests`, seis): total e número de páginas com `size=20`; páginas seguidas sem repetir nem pular alunos (ids 1–50, 51–100 e o início da página 9); `size=500` devolve no máximo 50 itens; página além do fim devolve lista vazia com o total correto; filtro `ativo=false` pagina só os inativos; filtro por nome com ordenação e página pequena. Como outros testes criam e desativam alunos no mesmo banco, os totais são comparados com "pelo menos". Suíte: **80 testes** passando, inclusive em ordem aleatória de classes.
+- **Verificado no MySQL local** (2026-11-02): ao subir, o Flyway aplicou a `V3`; no banco ficaram 408 alunos (40 inativos). Pela API: padrão `size` 20 → 21 páginas; `page=20` tem 8 itens (408 = 20×20 + 8); `page=21` devolve lista vazia com `totalElements` 408; `size=500` → 50 itens; `ativo=false` → 40; `nome=adriana&sort=nome,desc` → 20 resultados em ordem decrescente; `sort=dataNascimento,desc` → datas decrescentes; `sort=senha` → 400.
+- **Detalhe do banco local:** o id mais alto é 409 (não 408), porque o id 9 foi o aluno de teste apagado no passo 23. Por isso a página 0 de `size=50` termina no id 51 e a página 1 começa no 52. Está correto: nenhum aluno repetido ou pulado.
+- **Bateria completa depois da paginação** (2026-11-02, MySQL local, por curl): 28 verificações, todas conforme o contrato, e o banco terminou com os mesmos 408 alunos. Cobriu: `GET` lista, por id, inexistente (404), id `0` e `abc` (400); `POST` 201 com `Location`, e-mail repetido com outra caixa (409), campos inválidos, data futura e corpo ilegível (400), `Content-Type` não aceito (415); `PUT` 200, e-mail de outro aluno (409) e inexistente (404); `PATCH disable`/`enable` (idempotentes, 404 se não existe); `DELETE` 204 e depois 404, id inválido (400); método não permitido (405) e `Accept` inexistente (406); formatos JSON, XML e YAML; `sort` inexistente e `ativo=talvez` (400) e `size=500` (200, reduzido). O aluno criado na bateria (id 410) foi apagado pela própria rota, então o próximo id local será 411.
+- **Não executado:** a coleção do Postman em si (só foi validada como JSON e teve o item do `size=101` ajustado); a bateria acima foi por curl.
+- **Atenção ao levar para a AWS:** a `V3` é uma migration como qualquer outra. Na **próxima release**, o Flyway vai aplicá-la no RDS e inserir os 400 alunos lá também. Em projeto real, dados de exemplo não vão para produção; aqui é aceitável por ser estudo, mas é uma decisão a tomar **antes** de fazer a release: depois de aplicada, a `V3` não pode ser editada (só desfeita por uma `V4` que apague as linhas).
+
+## 28. HATEOAS (passo 26 do playbook, opcional)
+
+- **Status:** concluído (branch `feature/hateoas`). Escolha do usuário: opção 1, HAL só na **listagem** e no **`GET /alunos/{id}`**; os demais endpoints não mudam.
+- **Dependência:** `spring-boot-starter-hateoas` (Spring HATEOAS 3.1.3, gerenciado pelo Boot 4.1.2). Funciona com o Jackson 3 do Boot 4; confirmei rodando, não só pela documentação.
+- **Como ficou:**
+  - `AlunoResponse` ganhou `@Relation(collectionRelation = "alunos", itemRelation = "aluno")`, para a lista sair em `_embedded.alunos` (sem isso o nome seria `alunoResponseList`).
+  - `assembler/AlunoModelAssembler implements RepresentationModelAssembler<AlunoResponse, EntityModel<AlunoResponse>>`: cada aluno recebe `self`, `alunos` (a coleção) e **só a ação que faz sentido**: `disable` se está ativo, `enable` se está inativo.
+  - `AlunoController.listar` devolve `PagedModel<EntityModel<AlunoResponse>>` via `PagedResourcesAssembler` (gera `first`, `prev`, `self`, `next`, `last` e o bloco `page`); `buscar` devolve `EntityModel<AlunoResponse>`. O service passou a devolver `Page<Aluno>` e o `PageResponse` (o record do passo 10) foi **apagado**, porque o `Page` do Spring Data + o `PagedModel` o substituem.
+  - Os dois `GET` declaram `produces = {application/hal+json, application/json}`.
+- **Formato novo da listagem:**
+  ```json
+  { "_embedded": { "alunos": [ { "_links": { "self": {...}, "alunos": {...}, "disable": {...} }, "id": 1, "ativo": true, "email": "...", "nome": "...", "dataNascimento": "..." } ] },
+    "_links": { "first": {...}, "prev": {...}, "self": {...}, "next": {...}, "last": {...} },
+    "page": { "number": 0, "size": 20, "totalElements": 408, "totalPages": 21 } }
+  ```
+  Os links da página **preservam os filtros** (`nome`, `ativo`) e o tamanho. Lista vazia vem **sem `_embedded`** (só `_links.self` e `page`). Primeira página não tem `prev`; última não tem `next`. Os campos de cada aluno continuam na ordem do passo 10, com `_links` na frente.
+- **O contrato mudou de novo:**
+
+  | Antes (passos 5 a 10) | Agora |
+  | --- | --- |
+  | `content`, `page`, `size`, `totalElements`, `totalPages` na raiz | `_embedded.alunos`, `_links` e `page{number,size,totalElements,totalPages}` |
+  | `GET` lista e por id em JSON, XML ou YAML | em **HAL (JSON)**; `Accept` de XML/YAML → **406** (erro em JSON). Sem `Accept` ou `*/*` → JSON (HAL) |
+  | `POST`, `PUT`, `PATCH`, `DELETE` | **sem mudança** (JSON, XML e YAML, sem `_links`) |
+  | erros | sem mudança (sempre JSON) |
+- **Tropeços** (para o playbook):
+  1. **500 em toda listagem** na primeira subida: `methodOn(AlunoController.class).desativar(...)` faz o Spring HATEOAS criar um *proxy do tipo de retorno* do método, e `AlunoResponse` é um `record` (final): `Cannot subclass final class`. O `buscar` funcionou porque devolve `EntityModel`. Solução: os links `disable`/`enable` são montados com `linkTo(AlunoController.class).slash(id)` mais o texto do caminho.
+  2. **`test-compile` passou com erro de verdade escondido:** depois de apagar o `PageResponse`, sobrou o `.class` antigo em `target/` e a compilação incremental não reclamou. Só `./mvnw clean test-compile` mostrou os erros. Ao apagar uma classe, rode com `clean`.
+  3. **Um `sed` quebrou o `pom.xml`** (inseriu o XML com `\t` literais, `Non-parseable POM`). Voltei o arquivo com `git checkout` e refiz pelo editor. Para editar XML, não use `sed` com escapes de tabulação.
+  4. **`MockMvc` e os links:** os links da página nascem da URL da requisição, e o `MockMvc` não coloca `.param(...)` na query string. Nos testes de links com filtro a query vai na própria URL (`get("/alunos?nome=adriana&ativo=true&size=2")`). No `curl` real os filtros apareceram normalmente nos links.
+- **Testes:** 88 passando (inclusive em ordem aleatória de classes). Reescritos `ContentNegotiationTests` e `SerializationTests`: XML e YAML passam a ser provados pelo `PATCH /alunos/1/enable` (idempotente, devolve um `AlunoResponse` comum); novos testes provam o HAL, o 406 de XML/YAML nos dois `GET`, `application/hal+json`, links de página, links `disable`/`enable` por estado, filtros nos links e que as escritas não trazem `_links`. Os 30 testes do service e do controller de listagem trocaram `$.content` por `$._embedded.alunos`, e `$.page`/`$.size`/`$.totalElements` por `$.page.*`.
+- **Verificado no MySQL local** (2026-11-02): bateria completa por `curl` (30 verificações, 0 divergências), incluindo seguir os links `next` de uma página para outra, `disable` virando `enable` depois do `PATCH`, 406 em XML/YAML nos `GET`, e `PATCH` ainda respondendo em XML e YAML.
+- **Postman:** os scripts da listagem passaram a esperar `_embedded`, `_links` e `page` (e `page.size` no item do `size=101`); a descrição do item de listagem menciona o HAL. JSON da coleção válido; a coleção em si não foi executada no Postman.
+- **Ainda não está na produção:** a API da AWS (release 1.1.0) continua no contrato antigo.
+
 ## Próximos passos
 
-- Próximo passo do playbook (a partir do 25).
-- Segunda release (com o banco): RDS `Available` antes do merge na `main`; o Flyway cria a tabela no RDS.
-- Seções 12 a 14 do tutorial (rotina, problemas comuns, limpeza).
+- Continuar o playbook: o usuário cola o próximo passo (a numeração do playbook é diferente da nossa).
+- ~~Segunda release (com o banco)~~ (feita, passo 25).
+- Seções 12 a 14 do tutorial da AWS (rotina, problemas comuns, limpeza).
+- Ambiente da AWS desligado em 2026-11-02 (Desired tasks = 0 e RDS Stopped temporarily). O RDS parado religa sozinho em 7 dias (por volta de 2026-11-09). Decidir se apaga a branch `teste-ci-quebrado`.
 - Decidir sobre as sobras na AWS (`rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos`).

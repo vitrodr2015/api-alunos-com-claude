@@ -488,7 +488,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Tem paginação', () => pm.expect(pm.response.json()).to.have.all.keys('content', 'page', 'size', 'totalElements', 'totalPages'));"
+                  "pm.test('Resposta em HAL: _embedded, _links e page', () => pm.expect(pm.response.json()).to.have.all.keys('_embedded', '_links', 'page'));",
+                  "pm.test('page traz number, size, totalElements e totalPages', () => pm.expect(pm.response.json().page).to.have.all.keys('number', 'size', 'totalElements', 'totalPages'));"
                 ]
               }
             }
@@ -516,7 +517,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('No máximo 5 itens', () => pm.expect(pm.response.json().content.length).to.be.at.most(5));"
+                  "pm.test('No máximo 5 itens', () => pm.expect(pm.response.json()._embedded.alunos.length).to.be.at.most(5));"
                 ]
               }
             }
@@ -547,7 +548,7 @@
                 }
               ]
             },
-            "description": "sort aceita id, nome, email e dataNascimento, com ,asc ou ,desc."
+            "description": "Resposta em HAL (_embedded.alunos, _links e page). page começa em 0; size padrão 20 e máximo 50 (acima disso é reduzido); sort aceita qualquer campo do aluno (id, nome, email, dataNascimento, ativo), com ,asc ou ,desc. Campo inexistente dá 400."
           }
         },
         {
@@ -592,7 +593,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Todos ativos', () => pm.response.json().content.forEach(a => pm.expect(a.ativo).to.eql(true)));"
+                  "pm.test('Todos ativos', () => pm.response.json()._embedded.alunos.forEach(a => pm.expect(a.ativo).to.eql(true)));"
                 ]
               }
             }
@@ -626,7 +627,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Todos inativos', () => pm.response.json().content.forEach(a => pm.expect(a.ativo).to.eql(false)));"
+                  "pm.test('Todos inativos', () => pm.response.json()._embedded.alunos.forEach(a => pm.expect(a.ativo).to.eql(false)));"
                 ]
               }
             }
@@ -1150,19 +1151,15 @@
           }
         },
         {
-          "name": "400 - Listar com size 101",
+          "name": "200 - Listar com size 101 (não é erro: é reduzido para 50)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
-                  "pm.test('Corpo no formato ErrorResponse', () => {",
-                  "  const corpo = pm.response.json();",
-                  "  pm.expect(corpo).to.have.all.keys('dataHora', 'status', 'erro', 'mensagem');",
-                  "  pm.expect(corpo.status).to.eql(400);",
-                  "});"
+                  "pm.test('Status 200 (size acima do máximo é reduzido, não recusado)', () => pm.response.to.have.status(200));",
+                  "pm.test('size reduzido para o máximo de 50', () => pm.expect(pm.response.json().page.size).to.eql(50));"
                 ]
               }
             }

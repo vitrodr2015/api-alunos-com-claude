@@ -185,7 +185,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 
 - **Nomes próprios** em vez dos do tutorial (`rest-with-claude...`), para não misturar com outros projetos.
 - **Database `crud_alunos`**, criado pela aplicação na primeira conexão (`createDatabaseIfNotExist=true` na `DB_URL`), em vez do `rest_udemy` do tutorial. O database não foi criado no RDS.
-- **Variável `DB_URL` a mais que o tutorial.** O tutorial supõe que o endereço do banco já está no código; aqui ele entra como variável de ambiente na Task Definition. A aplicação lê `DB_URL`, `DB_USER` e `DB_PASSWORD` (ainda não implementado).
+- **Variável `DB_URL` a mais que o tutorial.** O tutorial supõe que o endereço do banco já está no código; aqui ele entra como variável de ambiente na Task Definition. A aplicação lê `DB_URL`, `DB_USER` e `DB_PASSWORD` (implementado no passo 19).
 - **Senha só no Secrets Manager** (`DB_PASSWORD` em `secrets`, tipo `ValueFrom`). Nunca no código, na imagem nem no Git.
 - **Porta 3306 do banco** só para o grupo da aplicação e para o IP do usuário (`/32`). Nunca `0.0.0.0/0`.
 - **`task-definition.json` fica versionado** (não vai no `.gitignore`): a esteira só enxerga o que está no repositório. Ele tem ID da conta e ARNs, mas nenhuma senha.
@@ -205,7 +205,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 2. ~~Seção 8: enviar a imagem para o ECR~~ (feito).
 3. ~~Seção 9: criar o Service~~ (feito; a tarefa só subiu depois de dar à `ecsTaskExecutionRole` a permissão de ler o secret).
 4. ~~Seção 10: testar a API pelo IP público (Postman)~~ (feito; sem Swagger nem login, o teste é `GET /alunos`).
-5. Conexão com o MySQL na aplicação: JPA, driver, `application.yml` lendo `DB_URL`/`DB_USER`/`DB_PASSWORD`, `repository`.
+5. ~~Conexão com o MySQL na aplicação: JPA, driver, `application.yml` lendo `DB_URL`/`DB_USER`/`DB_PASSWORD`, `repository`~~ (feito nos passos 17 a 22, só na `develop`; falta o `AlunoService` usar o repository).
 6. ~~Seção 11: workflow do GitHub Actions e secrets~~ (feito, ver "Esteira" abaixo; a pasta `.github/` está versionada e sem regra de ignore).
 7. Seções 12 a 14 (rotina, problemas comuns, limpeza) ainda não executadas. A seção 15 já foi usada (ligar e desligar).
 
@@ -354,8 +354,21 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - Regras: nunca editar uma migration já aplicada (criar uma nova); banco que já existia sem Flyway precisa de `baseline-on-migrate`; evitar `ddl-auto: update`.
 - **Deploy:** ao subir na AWS, o Flyway vai criar a tabela `aluno` no database `crud_alunos` do RDS na primeira vez. Isso exige o RDS `Available` e o usuário `root` com permissão de criar tabela (tem).
 
+## 22. Entidade e repository
+
+- **Status:** concluído (branch `feature/entidade-repository`)
+- `model/Aluno` virou entidade JPA: `@Entity`, `@Table(name = "aluno")`, `@Id` + `@GeneratedValue(strategy = IDENTITY)` e `@Column` em cada campo, com nomes e tamanhos iguais aos da migration `V1__create_table_aluno.sql` (`nome` 100, `email` 255, `data_nascimento`, `ativo`). Em Spring Boot 4 / Jakarta, as anotações vêm de `jakarta.persistence`.
+- `repository/AlunoRepository extends JpaRepository<Aluno, Long>`. Sem consultas próprias por enquanto; elas entram quando o `AlunoService` passar a usar o banco.
+- O `AlunoService` **continua usando a lista em memória**: este passo só cria a entidade e o repository. A troca fica para o passo seguinte, junto com a migration `V2__...` dos 8 alunos fixos.
+- Verificado (2026-11-01):
+  - `mvnw test`: 52 testes passando (H2, com `ddl-auto: create-drop`);
+  - aplicação no MySQL local com `ddl-auto: validate`: sobe em cerca de 4 s, sem reclamar de coluna ou tipo (o "Pronto quando");
+  - prova de que o `validate` confere de verdade: troquei temporariamente o nome da coluna `data_nascimento` na entidade e a aplicação **não subiu**, com `Schema validation: missing column [data_nasc_errada] in table [aluno]`. A alteração foi desfeita. Até este passo o `validate` não tinha nenhuma entidade para conferir, então "subir sem erro" ainda não provava nada.
+- Os testes com H2 não validam a migration do MySQL (o H2 cria o schema a partir da entidade, e o Flyway está desligado neles); a conferência contra o MySQL real é a subida acima. Um teste automático de repositório entra no Passo 24 do playbook.
+
 ## Próximos passos
 
-- Conectar a aplicação ao MySQL (passo 5 da lista "Falta fazer" do passo 11).
+- Trocar o `AlunoService` pelo `AlunoRepository` e criar a `V2__...` com os 8 alunos fixos.
+- Segunda release (com o banco): RDS `Available` antes do merge na `main`; o Flyway cria a tabela no RDS.
 - Seções 12 a 14 do tutorial (rotina, problemas comuns, limpeza).
 - Decidir sobre as sobras na AWS (`rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos`).

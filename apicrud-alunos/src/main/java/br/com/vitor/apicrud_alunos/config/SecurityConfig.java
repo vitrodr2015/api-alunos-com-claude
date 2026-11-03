@@ -3,11 +3,16 @@ package br.com.vitor.apicrud_alunos.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.ProviderManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -42,9 +47,22 @@ public class SecurityConfig {
 				.authorizeHttpRequests(rotas -> rotas
 						.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 						.requestMatchers(HttpMethod.POST, "/auth/signin", "/auth/refresh").permitAll()
+						// cadastro de usuários: só quem tem a permissão ADMIN (qualquer método; sem token dá 401, sem a permissão dá 403)
+						.requestMatchers("/auth/register").hasAuthority("ADMIN")
 						.anyRequest().authenticated())
 				.addFilterBefore(new JwtTokenFilter(tokenProvider), UsernamePasswordAuthenticationFilter.class)
 				.build();
+	}
+
+	// Confere usuário e senha no login (/auth/signin): carrega o usuário pelo UserService e compara a senha com o hash.
+	// Para usuário inexistente o Spring ainda gasta o tempo de uma comparação de hash, o que dificulta descobrir
+	// quais usuários existem medindo a demora da resposta.
+	@Bean
+	public AuthenticationManager authenticationManager(UserDetailsService userDetailsService,
+			PasswordEncoder passwordEncoder) {
+		DaoAuthenticationProvider provedor = new DaoAuthenticationProvider(userDetailsService);
+		provedor.setPasswordEncoder(passwordEncoder);
+		return new ProviderManager(provedor);
 	}
 
 }

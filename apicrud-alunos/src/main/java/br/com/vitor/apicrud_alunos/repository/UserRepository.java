@@ -10,4 +10,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
 	Optional<User> findByUserName(String userName);
 
+	// o nome de usuário é único sem diferenciar maiúsculas de minúsculas (no MySQL a collation já faz isso; no H2 não)
+	boolean existsByUserNameIgnoreCase(String userName);
+
 }

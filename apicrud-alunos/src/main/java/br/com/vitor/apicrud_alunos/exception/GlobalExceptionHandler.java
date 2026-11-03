@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -25,6 +26,7 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import br.com.vitor.apicrud_alunos.security.InvalidCredentialsException;
 import br.com.vitor.apicrud_alunos.security.InvalidTokenException;
 
 @RestControllerAdvice
@@ -53,6 +55,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(InvalidTokenException.class)
 	public ResponseEntity<ErrorResponse> handleInvalidToken(InvalidTokenException ex) {
 		return build(HttpStatus.UNAUTHORIZED, ex.getMessage());
+	}
+
+	// login recusado: sempre a mesma resposta, não importa o motivo (não revela quais usuários existem)
+	@ExceptionHandler(InvalidCredentialsException.class)
+	public ResponseEntity<ErrorResponse> handleInvalidCredentials(InvalidCredentialsException ex) {
+		return build(HttpStatus.UNAUTHORIZED, ex.getMessage());
+	}
+
+	// o banco recusou por uma restrição (ex.: dois cadastros do mesmo e-mail ou usuário ao mesmo tempo, que passaram
+	// juntos pela checagem do service): é um conflito, não um erro do servidor
+	@ExceptionHandler(DataIntegrityViolationException.class)
+	public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex) {
+		log.warn("Violação de restrição do banco: {}", ex.getMostSpecificCause().getClass().getSimpleName());
+		return build(HttpStatus.CONFLICT, "O registro entra em conflito com um já existente");
 	}
 
 	@ExceptionHandler(ConflictException.class)

@@ -31,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import br.com.vitor.apicrud_alunos.model.Permission;
 import br.com.vitor.apicrud_alunos.model.User;
+import br.com.vitor.apicrud_alunos.repository.PermissionRepository;
 import jakarta.persistence.EntityManager;
 
 // A cadeia de segurança inteira (JwtTokenFilter + SecurityConfig) com o banco de verdade.
@@ -48,6 +49,9 @@ class SecurityFilterChainTests {
 
 	@Autowired
 	private UserDetailsService userDetailsService;
+
+	@Autowired
+	private PermissionRepository permissionRepository;
 
 	@Autowired
 	private EntityManager em;
@@ -74,8 +78,10 @@ class SecurityFilterChainTests {
 		return "Bearer " + token;
 	}
 
+	// token de um usuário com a permissão USER (a mais básica): estar logado não basta, a rota exige permissão
 	private String accessTokenValido() {
-		return provider.createTokenPair(usuario()).accessToken();
+		Permission user = permissionRepository.findByDescription(Authorities.USER).orElseThrow();
+		return provider.createTokenPair(usuario(user)).accessToken();
 	}
 
 	private static ResultMatcher naoE401() {
@@ -229,7 +235,12 @@ class SecurityFilterChainTests {
 				.andExpect(status().isOk());
 		mockMvc.perform(patch("/alunos/" + id + "/disable").header(HttpHeaders.AUTHORIZATION, bearer(token)))
 				.andExpect(status().isOk());
+		// apagar é só do ADMIN: o USER recebe 403 e o ADMIN consegue (a matriz completa está em AuthorizationTests)
 		mockMvc.perform(delete("/alunos/" + id).header(HttpHeaders.AUTHORIZATION, bearer(token)))
+				.andExpect(status().isForbidden());
+		Permission admin = permissionRepository.findByDescription(Authorities.ADMIN).orElseThrow();
+		String tokenAdmin = provider.createTokenPair(usuario(admin)).accessToken();
+		mockMvc.perform(delete("/alunos/" + id).header(HttpHeaders.AUTHORIZATION, bearer(tokenAdmin)))
 				.andExpect(status().isNoContent());
 	}
 
@@ -242,8 +253,9 @@ class SecurityFilterChainTests {
 				.andExpect(jsonPath("$.erro").value("Não encontrado"));
 		mockMvc.perform(get("/alunos").param("sort", "senha").header(HttpHeaders.AUTHORIZATION, bearer(token)))
 				.andExpect(status().isBadRequest());
+		// rota sem regra de autorização é NEGADA (403), mesmo para quem está logado; não vira 404
 		mockMvc.perform(get("/rota-que-nao-existe").header(HttpHeaders.AUTHORIZATION, bearer(token)))
-				.andExpect(status().isNotFound());
+				.andExpect(status().isForbidden());
 	}
 
 	// ---------- stateless ----------

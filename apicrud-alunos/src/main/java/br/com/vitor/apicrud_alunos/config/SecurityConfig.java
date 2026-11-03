@@ -16,6 +16,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import br.com.vitor.apicrud_alunos.security.Authorities;
 import br.com.vitor.apicrud_alunos.security.JwtTokenFilter;
 import br.com.vitor.apicrud_alunos.security.JwtTokenProvider;
 import br.com.vitor.apicrud_alunos.security.RestAccessDeniedHandler;
@@ -48,8 +49,21 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 						.requestMatchers(HttpMethod.POST, "/auth/signin", "/auth/refresh").permitAll()
 						// cadastro de usuários: só quem tem a permissão ADMIN (qualquer método; sem token dá 401, sem a permissão dá 403)
-						.requestMatchers("/auth/register").hasAuthority("ADMIN")
-						.anyRequest().authenticated())
+						.requestMatchers("/auth/register").hasAuthority(Authorities.ADMIN)
+						// ---- autorização por rota: quem pode o quê (estar logado não basta) ----
+						// leitura: USER ou ADMIN
+						.requestMatchers(HttpMethod.GET, "/alunos", "/alunos/{id}").hasAnyAuthority(Authorities.USER, Authorities.ADMIN)
+						.requestMatchers(HttpMethod.HEAD, "/alunos", "/alunos/{id}").hasAnyAuthority(Authorities.USER, Authorities.ADMIN)
+						// escrita reversível: USER ou ADMIN (criar, editar, ativar e desativar)
+						.requestMatchers(HttpMethod.POST, "/alunos").hasAnyAuthority(Authorities.USER, Authorities.ADMIN)
+						.requestMatchers(HttpMethod.PUT, "/alunos/{id}").hasAnyAuthority(Authorities.USER, Authorities.ADMIN)
+						.requestMatchers(HttpMethod.PATCH, "/alunos/{id}/disable", "/alunos/{id}/enable")
+								.hasAnyAuthority(Authorities.USER, Authorities.ADMIN)
+						// apagar é destrutivo e irreversível: só ADMIN
+						.requestMatchers(HttpMethod.DELETE, "/alunos/{id}").hasAuthority(Authorities.ADMIN)
+						// REGRA FINAL: o que não tem regra acima é NEGADO (e não "liberado para qualquer logado").
+						// Toda rota nova nasce fechada e só abre quando alguém escrever a regra dela aqui.
+						.anyRequest().denyAll())
 				.addFilterBefore(new JwtTokenFilter(tokenProvider), UsernamePasswordAuthenticationFilter.class)
 				.build();
 	}

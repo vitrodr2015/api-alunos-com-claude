@@ -29,3 +29,7 @@ security:
     issuer: apicrud-alunos
     access-token-expiration: 15m
     refresh-token-expiration: 24h
+
+# Origens de CORS só para os testes (duas, para provar a lista e o espaço depois da vírgula)
+cors:
+  allowed-origins: https://app.exemplo.com, http://localhost:3000

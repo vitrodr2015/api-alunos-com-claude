@@ -623,7 +623,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 
 ## 37. Segurança, parte 8: autorização por rota (passo 35 do playbook)
 
-- **Status:** concluído na branch `feature/autorizacao`, **empilhada sobre o PR #29** (autenticação), que ainda não foi mesclado. O PR deste passo só será aberto depois que o #29 entrar na `develop`.
+- **Status:** concluído na branch `feature/autorizacao`. Ela foi feita **empilhada sobre o PR #29** (autenticação), que o sistema não deixou eu mesclar enquanto você não pedisse explicitamente; depois do seu "pode" ele entrou na `develop` (merge commit `2ae49ed`, 2026-11-02) e este PR passou a poder sair.
 - **A ideia do passo:** autenticação responde "quem é você"; autorização responde "o que você pode fazer". Até aqui qualquer usuário logado, mesmo sem nenhuma permissão, fazia tudo em `/alunos`. O alerta do playbook ("No projeto de referência, qualquer usuário autenticado acessa todas as rotas de dados") era exatamente este nosso estado.
 - **Decisão de projeto (o playbook deixa em aberto; fica numa tabela só, em `SecurityConfig`, fácil de mudar):**
 

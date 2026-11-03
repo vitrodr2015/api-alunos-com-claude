@@ -623,7 +623,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 
 ## 37. Segurança, parte 8: autorização por rota (passo 35 do playbook)
 
-- **Status:** concluído na branch `feature/autorizacao`, **empilhada sobre o PR #29** (autenticação), que ainda não foi mesclado. O PR deste passo só será aberto depois que o #29 entrar na `develop`.
+- **Status:** concluído na branch `feature/autorizacao`. Ela foi feita **empilhada sobre o PR #29** (autenticação), que o sistema não deixou eu mesclar enquanto você não pedisse explicitamente; depois do seu "pode" ele entrou na `develop` (merge commit `2ae49ed`, 2026-11-02) e este PR passou a poder sair.
 - **A ideia do passo:** autenticação responde "quem é você"; autorização responde "o que você pode fazer". Até aqui qualquer usuário logado, mesmo sem nenhuma permissão, fazia tudo em `/alunos`. O alerta do playbook ("No projeto de referência, qualquer usuário autenticado acessa todas as rotas de dados") era exatamente este nosso estado.
 - **Decisão de projeto (o playbook deixa em aberto; fica numa tabela só, em `SecurityConfig`, fácil de mudar):**
 
@@ -656,7 +656,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 
 ## 38. Segurança, parte 9: CORS (passo 36 do playbook)
 
-- **Status:** concluído na branch `feature/cors`, **empilhada** sobre `feature/autorizacao`, que por sua vez está sobre o PR #29 (autenticação, ainda aberto). Nenhum PR novo foi aberto: os PRs saem na ordem, depois que o #29 entrar na `develop`.
+- **Status:** concluído na branch `feature/cors`, **empilhada** sobre `feature/autorizacao` (PR #30). O PR #29 (autenticação) já foi mesclado na `develop`; os próximos entram na ordem #30 (autorização), depois este, depois o do endurecimento.
 - **O que é CORS:** o navegador, por padrão, não deixa uma página de um domínio ler a resposta de uma API de outro domínio. A API precisa dizer, por cabeçalhos, quais domínios (origens) ela autoriza. Antes de uma chamada "arriscada" (com `Authorization` ou `Content-Type: application/json`, ou métodos como `PUT`/`DELETE`), o navegador manda um pedido de teste, o **pré-voo** (`OPTIONS`), **sem token**. É ele que o Spring Security não pode barrar.
 - **Decisão (o playbook diz "somente as origens que realmente chamam a API"):** **hoje nenhum navegador chama esta API** (não há front-end), então a lista começa **vazia**, ou seja, sem CORS nenhum. As origens entram por configuração: `cors.allowed-origins`, vinda da variável de ambiente `CORS_ALLOWED_ORIGINS` (várias separadas por vírgula, espaços aparados). Diferente de um segredo, o valor vazio é um padrão **seguro**, então pode ter valor padrão. Na AWS não é preciso fazer nada por enquanto; quando houver um front-end, basta uma variável na Task Definition com o domínio dele.
 - **Implementação:** `WebConfig.addCorsMappings` (como o playbook pede), para `/**`: métodos `GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS`; cabeçalhos `Authorization, Content-Type, Accept`; **sem credenciais** (`allowCredentials(false)`: a autenticação é pelo cabeçalho, não por cookie); `Max-Age` de 3600 s (o navegador guarda o pré-voo por uma hora); e o cabeçalho **`Location` exposto**, porque o navegador só deixa o JavaScript ler cabeçalhos "seguros" e o `POST /alunos` devolve a URL do aluno criado nesse cabeçalho. A `SecurityConfig` já tinha `.cors(Customizer.withDefaults())` e `OPTIONS` liberado desde o passo 32.
@@ -681,7 +681,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 
 ## 39. Segurança, parte 10: credenciais iniciais e endurecimento (passo 37 do playbook)
 
-- **Status:** concluído na branch `feature/endurecimento`, a 4ª da pilha: PR #29 (aberto) → `feature/autorizacao` → `feature/cors` → `feature/endurecimento`. Nenhum PR novo aberto. **Falta a parte do console da AWS** (roteiro abaixo), que é do responsável.
+- **Status:** concluído na branch `feature/endurecimento`, a última da pilha: PR #29 (já mesclado) → PR #30 `feature/autorizacao` → `feature/cors` → `feature/endurecimento`. **Falta a parte do console da AWS** (roteiro abaixo), que é do responsável.
 - **O "pronto quando" do passo, e por que não estava pronto:** "não existe login conhecido que funcione no ambiente publicado". O usuário `admin` da `V5` tinha uma senha que foi **mostrada no chat**, ou seja, era um login conhecido que iria para o RDS na próxima release.
 - **Três itens do playbook:**
   1. **Segredo JWT forte no gerenciador de segredos:** o código já não tem valor padrão (`security.jwt.secret: ${JWT_SECRET}`; sem a variável a aplicação não sobe, e um guarda de teste impede que alguém coloque um valor padrão). Falta criar o segredo no Secrets Manager (roteiro abaixo).
@@ -721,8 +721,33 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 
 ## Próximos passos
 
-- Continuar o playbook: o usuário cola o próximo passo (a numeração do playbook é diferente da nossa).
-- ~~Segunda release (com o banco)~~ (feita, passo 25).
-- Seções 12 a 14 do tutorial da AWS (rotina, problemas comuns, limpeza).
-- **Ambiente da AWS LIGADO** desde a release 1.2.0 (2026-11-02): RDS Available e Service com 1 tarefa. Ao terminar: Desired tasks = 0 e RDS Stopped temporarily (que religa sozinho em 7 dias). Decidir se apaga a branch `teste-ci-quebrado` e a remota `release/1.2.0`.
-- Decidir sobre as sobras na AWS (`rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos`).
+Atualizado no fim do dia 2026-11-02. A seção "COMO RETOMAR" do `memoria.md` tem a versão curta.
+
+### 1. Mesclar a pilha de PRs da segurança (a ordem importa; cada merge só com o "pode" explícito do usuário)
+
+A `develop` já tem a segurança até a **autenticação** (PRs #27 e #29, 200 testes). Faltam três branches empilhadas, cada uma sobre a anterior:
+
+| Ordem | Branch | O que traz | Estado |
+| --- | --- | --- | --- |
+| 1 | `feature/autorizacao` (PR #30) | quem pode o quê, regra final `denyAll` | PR aberto, `build` verde |
+| 2 | `feature/cors` | CORS por origens configuradas, vazio por padrão | branch no GitHub |
+| 3 | `feature/endurecimento` | `V6`, primeiro admin por variável de ambiente, guardas de teste | branch no GitHub |
+
+Cada uma já contém as anteriores (foram juntadas com `merge`, sem reescrever história). Depois de mesclar a #30, abrir o PR da próxima; as anotações (`PassoAPasso.md` e `memoria.md`) podem dar conflito entre elas: manter as duas versões.
+
+### 2. NÃO fazer release da segurança antes disto (a tarefa na AWS não sobe sem o `JWT_SECRET`)
+
+O roteiro completo está no passo 39. Resumo: segredo do JWT e segredo da senha do primeiro admin no Secrets Manager; permissão de leitura na `ecsTaskExecutionRole`; `JWT_SECRET` (e, só no primeiro deploy, `ADMIN_BOOTSTRAP_PASSWORD`) em `secrets` no `task-definition.json`, **só depois de existirem os ARNs**; depois do primeiro start, tirar o bootstrap. Tudo isso é do console da AWS. O perfil `crud-alunos` da CLI não tem permissão de Secrets Manager nem de IAM.
+
+### 3. Continuar o playbook
+
+O usuário cola o próximo passo, um de cada vez (a numeração do playbook é diferente da nossa). O que vem depois do CORS e do endurecimento é o "Passo 38 do playbook" (testes de segurança que faltam). O 403 de rotas de dados, o 401 de tokens ruins e o login já têm teste.
+
+### 4. Pendências de antes
+
+- **Ambiente da AWS LIGADO** (RDS e Service) desde a release 1.2.0; ao terminar, *Desired tasks* = 0 e RDS *Stop temporarily*. O RDS parado religa sozinho após 7 dias (previsto por volta de **2026-11-09**).
+- Swagger e `v3/api-docs`: adiado até o Swagger existir (decisão do usuário).
+- Seções 12 a 14 do tutorial da AWS (rotina, problemas comuns, limpeza): ainda não executadas.
+- Sobras na AWS: `rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos` (sem o "i") e a política `LerSecretDB_CrudAlunos` que ficou numa role errada.
+- Branches remotas já mescladas que podem ser apagadas **quando o usuário pedir**: `feature/autenticacao`. A `teste-ci-quebrado` nunca foi mesclada, de propósito.
+- Limitações de segurança conhecidas: sem limite de tentativas de login nem bloqueio de conta; não há endpoint para trocar senha nem para dar `ADMIN` a outro usuário (só pelo banco).

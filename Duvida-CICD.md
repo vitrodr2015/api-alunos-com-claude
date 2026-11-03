@@ -54,6 +54,7 @@
 | 11. Ligar a esteira (GitHub Actions) | ✅ Feita (primeiro deploy: Task Definition `:2`; release 1.1.0 com o banco: `:6`, ver seção 11) |
 | 15.1 Ligar o ambiente | ✅ Feita em 2026-11-01 e em 2026-11-02, duas vezes (antes das releases 1.1.0 e 1.2.0). **Ambiente ligado agora, desligar pendente.** |
 | 15.2 Desligar o ambiente | ✅ Feita em 2026-10-30 e de novo em 2026-11-02 (Desired tasks = 0 e RDS `Stopped temporarily`) |
+| Segurança: segredo `JWT_SECRET` + senha do primeiro admin (Secrets Manager, IAM, Task Definition) | ⏳ **Ainda não executada** (roteiro no `PassoAPasso.md`, passo 39). Necessária antes da primeira release com segurança; nada foi alterado na AWS neste passo |
 
 ---
 

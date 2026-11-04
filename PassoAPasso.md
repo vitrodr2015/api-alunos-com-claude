@@ -726,6 +726,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Deploy:** esteira verde, Service na task definition `:8`, rollout `COMPLETED` com 1 tarefa. O RDS estava Available (confirmado pelo usuário).
 - **Verificado na AWS sem a senha do admin:** `GET /alunos` sem token → 401; `POST /auth/signin` com a senha antiga que foi mostrada no chat → 401; `/actuator/env` → 401.
 - **Ainda por fazer:** (1) o usuário testar `POST /auth/signin` com `admin` e a senha do segredo (deve dar 200); (2) **remover `ADMIN_BOOTSTRAP_PASSWORD` do `task-definition.json`** e fazer novo deploy (release de correção `1.3.1` ou similar); opcionalmente apagar o segredo `admin-bootstrap-password`.
+- **2026-11-04 (release 1.3.1):** o usuário confirmou o login na AWS; `ADMIN_BOOTSTRAP_PASSWORD` foi tirado de `secrets` no `task-definition.json` e a release 1.3.1 faz o novo deploy. O segredo `admin-bootstrap-password` pode ser apagado do Secrets Manager (opcional).
 
 ## Próximos passos
 > **Atualização 2026-11-03:** o usuário criou o segredo `secrets_crud_alunos/jwt-secret` e liberou a leitura na `ecsTaskExecutionRole`; `JWT_SECRET` já está em `secrets` do `task-definition.json` (branch `feature/endurecimento`, ainda não implantado). O segredo da senha do primeiro admin também foi criado e `ADMIN_BOOTSTRAP_PASSWORD` entrou em `secrets` (confirmar que a política de leitura tem o ARN). Depois do 1º deploy, REMOVER essa variável do arquivo e fazer novo deploy.

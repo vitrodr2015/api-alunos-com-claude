@@ -32,7 +32,7 @@ public class AuthService {
 	private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
 	// permissão que todo usuário cadastrado recebe (semeada na migration V5)
-	static final String PERMISSAO_PADRAO = "USER";
+	static final String PERMISSAO_PADRAO = br.com.vitor.apicrud_alunos.security.Authorities.USER;
 
 	// limite do BCrypt, em BYTES (letras acentuadas ocupam mais de um byte)
 	static final int LIMITE_DA_SENHA_EM_BYTES = 72;

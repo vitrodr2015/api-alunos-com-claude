@@ -621,6 +621,39 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Tropeços do caminho:** (1) o `java` de um arquivo só precisou de caminhos do Windows no classpath (`cygpath -w`), não os do Git Bash; (2) no teste unitário, reprogramar um mock dentro de um laço com `when(...).thenThrow(...)` chama o método já programado e estoura: o certo é `doThrow(...).when(...)`; (3) o `sed` continua proibido para inserir código com tabulação, usei só o editor; (4) um `heredoc` grande com muitos apóstrofos falhou no shell: textos longos vão pelo editor.
 - **Efeito na AWS (planejado, não executado):** a próxima release que levar isto fará o Flyway criar as tabelas `users`, `permission` e `user_permission` e o `admin` no RDS. Continua valendo: precisa do segredo novo `JWT_SECRET` (Secrets Manager, Task Definition e permissão na role), e quem for usar a API passa a fazer login antes. Ainda faltam, no playbook, o CORS (passo 36) e os testes de segurança restantes (passo 38).
 
+## 37. Segurança, parte 8: autorização por rota (passo 35 do playbook)
+
+- **Status:** concluído na branch `feature/autorizacao`. Ela foi feita **empilhada sobre o PR #29** (autenticação), que o sistema não deixou eu mesclar enquanto você não pedisse explicitamente; depois do seu "pode" ele entrou na `develop` (merge commit `2ae49ed`, 2026-11-02) e este PR passou a poder sair.
+- **A ideia do passo:** autenticação responde "quem é você"; autorização responde "o que você pode fazer". Até aqui qualquer usuário logado, mesmo sem nenhuma permissão, fazia tudo em `/alunos`. O alerta do playbook ("No projeto de referência, qualquer usuário autenticado acessa todas as rotas de dados") era exatamente este nosso estado.
+- **Decisão de projeto (o playbook deixa em aberto; fica numa tabela só, em `SecurityConfig`, fácil de mudar):**
+
+  | Rota | Quem pode |
+  | --- | --- |
+  | `GET` e `HEAD` em `/alunos` e `/alunos/{id}` | `USER` ou `ADMIN` |
+  | `POST /alunos`, `PUT /alunos/{id}`, `PATCH /alunos/{id}/disable`, `PATCH /alunos/{id}/enable` | `USER` ou `ADMIN` |
+  | `DELETE /alunos/{id}` (destrutivo e irreversível) | só `ADMIN` |
+  | `POST /auth/register` | só `ADMIN` (do passo anterior) |
+  | `POST /auth/signin`, `POST /auth/refresh` e `OPTIONS` | públicos |
+  | **qualquer outra rota** | **negada** |
+
+  O raciocínio: apagar não tem volta, então fica só com o ADMIN; criar, editar, ativar e desativar são reversíveis (o `disable` é uma "exclusão lógica"), então o USER também pode.
+- **Escolha: regras no `SecurityConfig` (`requestMatchers`) e não `@PreAuthorize`.** O playbook oferece as duas. Deixei tudo em um lugar só, onde dá para ler a lista inteira de quem pode o quê (e a lista de públicas). `@EnableMethodSecurity` duplicaria a regra em dois lugares. As permissões viraram constantes (`security/Authorities`: `ADMIN`, `USER`), porque um texto digitado errado compilaria e deixaria a rota fechada para todos.
+- **Regra final mudou de `authenticated()` para `denyAll()`** (diferença do passo 32 do playbook, que pedia `anyRequest().authenticated()`). Com `authenticated()`, **toda rota nova nasceria aberta a qualquer usuário logado**, e é essa a armadilha que o playbook aponta ("parar na autenticação"). Com `denyAll()` a rota nova nasce **fechada** e só abre quando alguém escreve a regra dela. Efeito colateral: uma rota inexistente agora responde **403 para quem está logado** (antes 404) e 401 para anônimo.
+- **O HEAD tem regra própria** (`requestMatchers(HttpMethod.HEAD, ...)`): o Spring MVC trata HEAD como GET, mas o Spring Security compara o método exato. Sem a linha, o HEAD cairia no `denyAll` (mutação testada).
+- **A autorização vem antes da existência:** um usuário sem permissão recebe 403 também para um id que não existe (e não 404), então não consegue sondar quais alunos existem.
+- **Quem manda é o banco, não o token:** o filtro recarrega o usuário a cada requisição, então as permissões vêm do banco. Testado: um token emitido quando o usuário era ADMIN passa a receber 403 no `DELETE` assim que o ADMIN é revogado no banco, e um token forjado por dentro com `"roles":["ADMIN"]` para um usuário que só é USER também recebe 403.
+- **Testes novos (12 + ajustes):**
+  - `AuthorizationTests` (12, integração, filtros ligados, banco de verdade, transação desfeita): uma **matriz** de 11 chamadas por perfil (`GET /alunos`, `GET /alunos/{id}`, `HEAD`, `POST`, `PUT`, `PATCH disable`, `PATCH enable`, `DELETE`, e três rotas sem regra) contra 6 perfis (anônimo, logado sem permissão, logado com outra permissão, `USER`, `ADMIN`, `USER`+`ADMIN`); o 403 do `DELETE` é JSON e **não apagou nada**; id inexistente dá 403 sem permissão e 404 com permissão; permissão revogada no banco vale na requisição seguinte; token com `roles` forjado; as rotas `/auth` seguem com as regras próprias;
+  - `SecurityFilterChainTests` (ajustado): os tokens de teste agora têm a permissão `USER` (antes bastava estar logado); a rota inexistente passou a 403; o teste que apaga usa um ADMIN e prova que o USER recebe 403.
+  - O 403 pela cadeia inteira agora tem teste para as rotas de dados.
+- **O que as mudanças quebraram, de propósito:** ao ligar as regras, 5 testes antigos falharam, todos por 403 (tokens sem permissão; uma rota inexistente que passou de 404 a 403). Foi o sinal de que as regras estavam valendo.
+- **Os testes pegam falha de verdade (sabotagens, depois restauradas, arquivo idêntico ao original):** (1) deixar o USER apagar → 5 testes quebraram; (2) voltar a regra final para `authenticated()` → 6 quebraram; (3) fechar o `PUT` só para ADMIN → 2 quebraram; (4) esquecer a regra do HEAD → 3 quebraram.
+- **Contra o MySQL real:** `AuthorizationTests`, `SecurityFilterChainTests` e `AuthControllerTests` (61 testes) passaram com Flyway e `validate`; o banco ficou só com o `admin`, 2 permissões e 408 alunos.
+- **Prova ponta a ponta com HTTP de verdade (44 verificações, 0 divergências):** a mesma matriz com quatro perfis reais: anônimo, usuário sem permissão (criado no banco), `USER` (cadastrado pela API e com **login de verdade**) e `ADMIN` (token montado em Node). Anônimo 401 em tudo; sem permissão 403 em tudo (inclusive id inexistente); USER com 403 só no `DELETE` e nas rotas sem regra; ADMIN apaga (204). O 403 vem em JSON e o aluno não foi apagado. Banco limpo no fim (só o `admin`, 408 alunos).
+- **Placar:** 212 testes (eram 200), `mvn -B verify` verde com `JWT_SECRET` e `DB_PASSWORD` fora do ambiente, também em ordem aleatória de classes; `docker compose build` ok.
+- **Limite honesto:** a regra "USER apaga? não" é uma escolha minha, não uma verdade. Se o modelo de negócio quiser outra divisão (por exemplo, só ADMIN escreve), basta mudar as linhas do `SecurityConfig` e a matriz do `AuthorizationTests`. Também não existe ainda uma forma de dar a permissão ADMIN a outro usuário pela API: isso só se faz no banco.
+- **Contratos dos testes antigos:** os testes de contrato (`addFilters = false`) não foram tocados e seguem verdes, por não exercitarem a segurança; é a matriz acima que guarda as permissões.
+
 ## Próximos passos
 
 - Continuar o playbook: o usuário cola o próximo passo (a numeração do playbook é diferente da nossa).

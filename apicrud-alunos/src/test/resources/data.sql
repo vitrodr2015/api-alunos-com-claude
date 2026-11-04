@@ -418,3 +418,6 @@ INSERT INTO aluno (nome, email, data_nascimento, ativo) VALUES
     ('Rafaela Xavier', 'rafaela.xavier398@escola.com', '1994-08-17', TRUE),
     ('Samuel Xavier', 'samuel.xavier399@escola.com', '1994-09-23', TRUE),
     ('Tatiana Xavier', 'tatiana.xavier400@escola.com', '1994-10-30', FALSE);
+
+-- Permissões do sistema (as mesmas da migration V5 do MySQL). Sem usuário semeado: os testes criam os seus.
+INSERT INTO permission (description) VALUES ('ADMIN'), ('USER');

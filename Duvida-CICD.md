@@ -52,8 +52,10 @@
 | 9. Criar o Service (ECS) | ✅ Feita (`service-crud-alunos`, tarefa **Running** após corrigir a permissão do secret) |
 | 10. Testar a aplicação | ✅ Feita (API respondendo pelo IP público, testada no Postman) |
 | 11. Ligar a esteira (GitHub Actions) | ✅ Feita (primeiro deploy: Task Definition `:2`; release 1.1.0 com o banco: `:6`, ver seção 11) |
-| 15.1 Ligar o ambiente | ✅ Feita em 2026-11-01 e de novo em 2026-11-02 (RDS Available e Service com 1 tarefa, antes da release 1.1.0) |
+| 15.1 Ligar o ambiente | ✅ Feita em 2026-11-01 e em 2026-11-02, duas vezes (antes das releases 1.1.0 e 1.2.0). **Ambiente ligado agora, desligar pendente.** |
 | 15.2 Desligar o ambiente | ✅ Feita em 2026-10-30 e de novo em 2026-11-02 (Desired tasks = 0 e RDS `Stopped temporarily`) |
+| Segurança 1/2: segredo `JWT_SECRET` (Secrets Manager `secrets_crud_alunos/jwt-secret`, política `LerSecretDB_CrudAlunos` da `ecsTaskExecutionRole` com o ARN novo, `JWT_SECRET` em `secrets` do `task-definition.json`) | ✅ Feita em 2026-11-03 pelo usuário no console (segredo criado e política salva); o `task-definition.json` foi atualizado no repositório, mas **ainda não implantado** (só entra na release) |
+| Segurança 2/2: segredo da senha do primeiro admin (`secrets_crud_alunos/admin-bootstrap-password`; `ADMIN_BOOTSTRAP_PASSWORD` em `secrets` do `task-definition.json`, só no 1º deploy) | ✅ Segredo criado pelo usuário em 2026-11-03; `task-definition.json` atualizado, **não implantado**. A política `LerSecretDB_CrudAlunos` precisa conter este ARN (a confirmar com o usuário). Depois do 1º deploy, remover a variável do arquivo |
 
 ---
 
@@ -427,6 +429,8 @@ Ao final, a porta 3306 do grupo `default` ficou com estas origens:
 - **Efeito do código na AWS:** a Task Definition já tem `DB_URL`, `DB_USER` e `DB_PASSWORD` (esta via Secrets Manager) com os mesmos nomes que o `application.yml` passou a ler, então não precisa mudar na AWS. Na primeira release com o banco, o Flyway cria a tabela `aluno` no database `crud_alunos` do RDS e aplica a `V2` (insere os 8 alunos iniciais); o RDS precisa estar `Available`. **Atenção:** a partir do passo 27 existe também a `V3` (400 alunos de exemplo para testar a paginação); a próxima release a aplicaria no RDS, então decida antes se esses dados de exemplo devem ir para a AWS. Depois disso os dados passam a ficar no RDS e **sobrevivem** a trocar a tarefa; o 1º deploy não repete a carga nos seguintes (o Flyway guarda a versão aplicada).
 
 **Resultado do primeiro deploy com o banco (release 1.1.0, 2026-11-02):** com o RDS `Available` e o Service em 1, a esteira terminou com `success` e a tarefa subiu na `crud-alunos-task-definition:6`. A aplicação conectou no RDS com a senha vinda do Secrets Manager, o Flyway criou a tabela `aluno` e aplicou a `V2`, e `GET /alunos` devolveu os 8 alunos pelo IP público. Nada precisou mudar na Task Definition nem nas permissões. Dá para ver a tarefa e o IP sem abrir o console: `aws ecs describe-services` e `aws ecs describe-tasks` (perfil `crud-alunos`, que lê ECS e EC2).
+
+**Segundo deploy com o banco (release 1.2.0, 2026-11-02):** com o RDS `Available` e o Service em 1, a esteira terminou com `success` e a tarefa subiu na `crud-alunos-task-definition:7`. Foi o primeiro deploy a aplicar uma migration sobre um banco que já tinha dados (`V3`, 400 linhas em cima das 8 da `V2`), e o Flyway fez isso sem intervenção: 408 alunos no RDS. Nada precisou mudar na Task Definition nem nas permissões. O contrato da API mudou nessa release (HAL e paginação novas); o teste pelo IP público (`GET /alunos`) agora lê `_embedded.alunos` e `page`, e `Accept` de XML/YAML na listagem dá 406.
 
 **Para o tutorial novo:** dizer que o workflow precisa ser adaptado ao projeto (versão do Java, pasta do projeto, nome da imagem do `docker compose`, nomes do ECR, do contêiner, do Service e do cluster); avisar que o `task-definition.json` precisa existir e estar versionado; avisar que a tag do deploy é o hash do commit e que `latest` é só uma cópia; lembrar que *Desired tasks* não é alterado pela esteira.
 

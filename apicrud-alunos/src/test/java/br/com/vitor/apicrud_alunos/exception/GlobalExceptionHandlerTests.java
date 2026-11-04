@@ -1,7 +1,10 @@
 package br.com.vitor.apicrud_alunos.exception;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -11,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +23,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import br.com.vitor.apicrud_alunos.security.InvalidCredentialsException;
+import br.com.vitor.apicrud_alunos.security.InvalidTokenException;
 
 @WebMvcTest(GlobalExceptionHandlerTests.FakeController.class)
 @Import({ GlobalExceptionHandler.class, GlobalExceptionHandlerTests.FakeController.class })
@@ -43,6 +50,35 @@ class GlobalExceptionHandlerTests {
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.status").value(400))
 				.andExpect(jsonPath("$.mensagem").value("Dados inválidos"));
+	}
+
+	@Test
+	void tokenInvalidoRetorna401ComOMesmoFormatoDeErro() throws Exception {
+		mockMvc.perform(get("/fake/token-invalido"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.status").value(401))
+				.andExpect(jsonPath("$.erro").value("Não autenticado"))
+				.andExpect(jsonPath("$.mensagem").value("Token expirado"))
+				.andExpect(jsonPath("$.dataHora").exists());
+	}
+
+	@Test
+	void credenciaisInvalidasRetorna401ComAMensagemGenerica() throws Exception {
+		mockMvc.perform(get("/fake/credenciais"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.status").value(401))
+				.andExpect(jsonPath("$.erro").value("Não autenticado"))
+				.andExpect(jsonPath("$.mensagem").value("Credenciais inválidas"));
+	}
+
+	@Test
+	void violacaoDeRestricaoDoBancoRetorna409SemVazarODetalhe() throws Exception {
+		mockMvc.perform(get("/fake/integridade"))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.status").value(409))
+				.andExpect(jsonPath("$.erro").value("Conflito"))
+				.andExpect(jsonPath("$.mensagem").value("O registro entra em conflito com um já existente"))
+				.andExpect(content().string(not(containsString("uk_aluno_email"))));
 	}
 
 	@Test
@@ -148,6 +184,21 @@ class GlobalExceptionHandlerTests {
 		@GetMapping(value = "/outro/somente-json", produces = MediaType.APPLICATION_JSON_VALUE)
 		String somenteJson() {
 			return "ok";
+		}
+
+		@GetMapping("/fake/credenciais")
+		String credenciais() {
+			throw new InvalidCredentialsException();
+		}
+
+		@GetMapping("/fake/integridade")
+		String integridade() {
+			throw new DataIntegrityViolationException("Duplicate entry 'x' for key 'uk_aluno_email'");
+		}
+
+		@GetMapping("/fake/token-invalido")
+		String tokenInvalido() {
+			throw new InvalidTokenException("Token expirado");
 		}
 
 		@GetMapping("/fake/erro")

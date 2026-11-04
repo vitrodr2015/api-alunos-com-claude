@@ -22,3 +22,25 @@ spring:
         # sem page/size na URL: página 0 com 20 itens; size acima de 50 é reduzido para 50
         default-page-size: 20
         max-page-size: 50
+
+security:
+  jwt:
+    # Segredo sem valor padrão: sem JWT_SECRET a aplicação não sobe. Precisa de pelo menos 32 caracteres aleatórios (HS256).
+    secret: ${JWT_SECRET}
+    issuer: apicrud-alunos
+    # access token curto; refresh token mais longo (sem lista de revogação, um token vale até expirar)
+    access-token-expiration: 15m
+    refresh-token-expiration: 24h
+
+cors:
+  # Origens (domínios) que podem chamar a API pelo navegador, separadas por vírgula. Vazio = nenhuma (sem CORS).
+  # Nunca use '*': a aplicação não sobe. Exemplo: CORS_ALLOWED_ORIGINS=https://app.exemplo.com,http://localhost:5173
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+
+app:
+  admin-bootstrap:
+    # Criação CONTROLADA do primeiro administrador, numa execução única: defina ADMIN_BOOTSTRAP_PASSWORD (mínimo 12
+    # caracteres), suba a aplicação uma vez e REMOVA a variável. Vazio (o padrão) = desligado. Só cria se ainda não
+    # existir nenhum ADMIN. Na AWS a senha vem do Secrets Manager, nunca escrita em arquivo.
+    username: ${ADMIN_BOOTSTRAP_USERNAME:admin}
+    password: ${ADMIN_BOOTSTRAP_PASSWORD:}

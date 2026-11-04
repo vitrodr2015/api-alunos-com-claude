@@ -12,3 +12,9 @@
 #     br.com.vitor: DEBUG
 #
 # A senha do banco NÃO vai aqui: use a variável de ambiente DB_PASSWORD.
+#
+# CORS (só quando um front-end de outro domínio for chamar a API pelo navegador). Lista de origens separadas por
+# vírgula, sem barra no fim e NUNCA com '*' (a aplicação não sobe). Pode ser a variável de ambiente
+# CORS_ALLOWED_ORIGINS=http://localhost:5173 ou, aqui:
+# cors:
+#   allowed-origins: http://localhost:5173

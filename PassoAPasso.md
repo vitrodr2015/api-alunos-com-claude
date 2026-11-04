@@ -743,6 +743,32 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Verificado:** coleção inteira rodada com o `newman` contra a aplicação local num banco descartável, 52 requisições e 105 asserções sem falha, duas rodadas seguidas (a coleção se mantém sozinha); a senha do admin não aparece no log; o banco `crud_alunos` ficou intacto (408 alunos).
 - **Ordem sugerida:** `00` (sempre primeiro) → `0` (carga, opcional) → `1` → `2` → `3`.
 
+## 43. Pirâmide de testes: nível de integração com MySQL real (passo 38 do playbook)
+
+- **Status:** concluído na branch `feature/piramide-testes`. 274 testes (eram 259). Os níveis unitário, web e segurança já existiam (passos 23, 12, 33 e 34); este passo acrescentou o **nível de integração** e conferiu a pirâmide inteira.
+- **Nível novo:** `integration/FluxoCompletoIntegrationTests` (14 testes). Sobe a **aplicação inteira** (servidor de verdade, filtros ligados) contra um **MySQL 8.4 real em contêiner** (Testcontainers), com as migrations **V1 a V6 do Flyway** (sem H2, sem `data.sql`, `ddl-auto: validate`), chamada por **REST Assured** e com **tokens reais** emitidos pelo login. O primeiro admin nasce pelo mesmo caminho da produção (`AdminBootstrapRunner`). Cada teste usa nomes e e-mails únicos, então a ordem não importa.
+- **Dependências novas (só de teste):** `spring-boot-testcontainers`, `testcontainers-junit-jupiter` e `testcontainers-mysql` (versão 2.0.5 do BOM do Spring Boot) e `rest-assured` **6.0.0** (fixada no `pom.xml`; funcionou com Jackson 3 e Java 25 porque o corpo e a leitura usam texto e JsonPath). **Exige o Docker ligado**, também na esteira (o runner `ubuntu-latest` do GitHub já tem). Leva cerca de 40 s a mais por build.
+- **O que o nível cobre:**
+  - **Banco real:** as 6 migrations rodaram com sucesso, permissões `ADMIN` e `USER`, o `admin` semeado pela V5 **não existe mais**, o único admin é o do bootstrap com hash `{bcrypt}`, a carga de 408+ alunos.
+  - **Caso feliz:** login, criar, buscar, listar paginado, filtrar, atualizar, desativar, reativar, apagar; renovar token; usuário comum cadastrado pelo admin (só `USER`, hash no banco, senha não devolvida).
+  - **400:** corpo vazio, JSON quebrado, id zero e não numérico, `sort` inválido, login em branco. **404:** aluno inexistente em GET, DELETE e PATCH. **409:** e-mail repetido **inclusive em maiúsculas (regra do MySQL real)** e nome de usuário repetido.
+  - **401:** sem token (várias rotas), senha errada, usuário inexistente, **a senha antiga semeada**, token adulterado, vencido, assinado com outro segredo, do tipo errado (refresh como access e access como refresh), lixo, e usuário que não existe no banco.
+  - **403:** usuário comum no `DELETE` (e nada foi apagado) e no `/auth/register`; rotas sem regra e caminhos sensíveis negados até para o ADMIN; erros que não vazam detalhes internos.
+- **Matriz da pirâmide (por evidência nos testes):**
+
+| Nível | Ferramenta | Banco | Feliz | 400 | 404 | 401 | 403 | 409 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Unitário (service) | JUnit 5 + Mockito | nenhum | sim | sim | sim | sim (credenciais) | **não se aplica** | sim |
+| Web (controller) | MockMvc, filtros off nos testes de contrato | H2 | sim | sim | sim | sim (`AuthControllerTests`, filtros ligados) | sim (idem) | sim |
+| Segurança | MockMvc, filtros ligados | H2 | sim | sim | sim | sim | sim | sim (**novo**: `AuthorizationTests`) |
+| Integração | Testcontainers + REST Assured | MySQL 8.4 | sim | sim | sim | sim | sim | sim |
+
+  - **403 no service não se aplica:** a autorização mora no `SecurityConfig` (por rota), não nos services; o service não decide quem pode. Está coberto onde a decisão acontece (segurança, web e integração).
+  - **Lacuna achada e fechada:** a camada de segurança não tinha o 409; entrou `quemTemPermissaoVeOs409DeNegocioNormalmente` (e-mail e nome de usuário repetidos, com filtros ligados).
+  - Os testes de contrato (`AlunoControllerTests`) rodam com filtros desligados de propósito e por isso não têm 401/403; essas respostas são testadas em `AuthControllerTests`, `SecurityErrorHandlersTests` e `AuthorizationTests`.
+- **Sabotagens (as 3 detectadas, código restaurado):** permitir o `DELETE` ao USER → 3 falhas (inclusive o 403); a V6 deixar de apagar o admin semeado → 6+ falhas (o bootstrap não cria o admin e a verificação de migrations falha); deixar de conferir o tipo do token → 1 falha (refresh aceito como access). *A nova prova de 409 na camada de segurança não foi sabotada.*
+- **Fragilidade conhecida:** alguns testes de integração leem a carga inicial (`/alunos/1`, mais de 408 alunos). Se a V2/V3 mudar, ajustar.
+
 ## Próximos passos
 > **Atualização 2026-11-03:** o usuário criou o segredo `secrets_crud_alunos/jwt-secret` e liberou a leitura na `ecsTaskExecutionRole`; `JWT_SECRET` já está em `secrets` do `task-definition.json` (branch `feature/endurecimento`, ainda não implantado). O segredo da senha do primeiro admin também foi criado e `ADMIN_BOOTSTRAP_PASSWORD` entrou em `secrets` (confirmar que a política de leitura tem o ARN). Depois do 1º deploy, REMOVER essa variável do arquivo e fazer novo deploy.
 

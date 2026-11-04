@@ -720,7 +720,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Limitações que continuam:** não há limite de tentativas de login nem bloqueio de conta (uma senha fraca pode ser adivinhada por força bruta); o `admin` criado tem `ADMIN` e `USER`; trocar a senha de um usuário ainda exige mexer no banco (não há endpoint para isso).
 
 ## Próximos passos
-> **Atualização 2026-11-03:** o usuário criou o segredo `secrets_crud_alunos/jwt-secret` e liberou a leitura na `ecsTaskExecutionRole`; `JWT_SECRET` já está em `secrets` do `task-definition.json` (branch `feature/endurecimento`, ainda não implantado). Falta o segredo da senha do primeiro admin.
+> **Atualização 2026-11-03:** o usuário criou o segredo `secrets_crud_alunos/jwt-secret` e liberou a leitura na `ecsTaskExecutionRole`; `JWT_SECRET` já está em `secrets` do `task-definition.json` (branch `feature/endurecimento`, ainda não implantado). O segredo da senha do primeiro admin também foi criado e `ADMIN_BOOTSTRAP_PASSWORD` entrou em `secrets` (confirmar que a política de leitura tem o ARN). Depois do 1º deploy, REMOVER essa variável do arquivo e fazer novo deploy.
 
 Atualizado no fim do dia 2026-11-02. A seção "COMO RETOMAR" do `memoria.md` tem a versão curta.
 

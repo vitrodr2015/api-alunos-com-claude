@@ -728,6 +728,15 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Ainda por fazer:** (1) o usuário testar `POST /auth/signin` com `admin` e a senha do segredo (deve dar 200); (2) **remover `ADMIN_BOOTSTRAP_PASSWORD` do `task-definition.json`** e fazer novo deploy (release de correção `1.3.1` ou similar); opcionalmente apagar o segredo `admin-bootstrap-password`.
 - **2026-11-04 (release 1.3.1):** o usuário confirmou o login na AWS; `ADMIN_BOOTSTRAP_PASSWORD` foi tirado de `secrets` no `task-definition.json` e a release 1.3.1 faz o novo deploy. O segredo `admin-bootstrap-password` pode ser apagado do Secrets Manager (opcional).
 
+## 42. Coleções do Postman com autenticação (2026-11-04)
+
+- **Arquivos** (pasta `postman/`): `api-alunos.postman_collection.json` (a coleção, atualizada), `api-alunos-local.postman_environment.json` e `api-alunos-aws.postman_environment.json` (novo). Importar os três no Postman e escolher o ambiente no canto superior direito.
+- **Coleção:** pasta nova **`00 - Autenticação (rodar primeiro)`** (login do admin, renovar token, registrar usuário comum, login do usuário comum) e pasta nova **`3 - Segurança (401 e 403)`** (12 requisições: sem token, token inválido, refresh como access, login errado, 403 do usuário comum no DELETE e no register, actuator). Autenticação **Bearer `{{token}}` herdada da coleção**: o login guarda o token sozinho (`pm.environment.set`), sem copiar e colar.
+- **Ambientes:** preencher **`adminPassword`** (campo secreto, vem vazio de propósito: a senha nunca vai para o repositório) e, no da AWS, trocar `baseUrl` pelo IP público atual (`http://<IP>:8080`, muda a cada tarefa). O access token vale 15 minutos: rodar o "02 - Renovar" ou o login de novo.
+- **Duas requisições antigas mudaram de expectativa** por causa da regra `denyAll`: rota inexistente e `POST /alunos/1` agora dão **403** (antes 404 e 405).
+- **Verificado:** coleção inteira rodada com o `newman` contra a aplicação local num banco descartável, 52 requisições e 105 asserções sem falha, duas rodadas seguidas (a coleção se mantém sozinha); a senha do admin não aparece no log; o banco `crud_alunos` ficou intacto (408 alunos).
+- **Ordem sugerida:** `00` (sempre primeiro) → `0` (carga, opcional) → `1` → `2` → `3`.
+
 ## Próximos passos
 > **Atualização 2026-11-03:** o usuário criou o segredo `secrets_crud_alunos/jwt-secret` e liberou a leitura na `ecsTaskExecutionRole`; `JWT_SECRET` já está em `secrets` do `task-definition.json` (branch `feature/endurecimento`, ainda não implantado). O segredo da senha do primeiro admin também foi criado e `ADMIN_BOOTSTRAP_PASSWORD` entrou em `secrets` (confirmar que a política de leitura tem o ARN). Depois do 1º deploy, REMOVER essa variável do arquivo e fazer novo deploy.
 

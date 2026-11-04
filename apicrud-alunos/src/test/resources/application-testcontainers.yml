@@ -1,0 +1,13 @@
+# Perfil dos testes de INTEGRACAO (MySQL real em conteiner). Soma-se ao application.yml de teste, que usa H2.
+# Aqui o banco e o de producao: o Flyway cria tudo com as migrations V1 a V6 e o Hibernate so CONFERE (validate).
+spring:
+  flyway:
+    enabled: true
+  jpa:
+    defer-datasource-initialization: false
+    hibernate:
+      ddl-auto: validate
+  sql:
+    init:
+      # sem data.sql: os dados vem so das migrations
+      mode: never

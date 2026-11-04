@@ -225,6 +225,25 @@ class AuthorizationTests {
 				.andExpect(status().isBadRequest());
 	}
 
+	// com os filtros LIGADOS, quem tem permissão também recebe o 409 de negócio (e-mail repetido, nome de usuário repetido)
+	@Test
+	void quemTemPermissaoVeOs409DeNegocioNormalmente() throws Exception {
+		Long id = novoAluno();
+		String email = alunoRepository.findById(id).orElseThrow().getEmail();
+		String tokenUser = token(usuario(permissao("USER")));
+		String corpoRepetido = "{\"nome\":\"Aluno Repetido\",\"email\":\"" + email.toUpperCase()
+				+ "\",\"dataNascimento\":\"2000-01-15\"}";
+
+		mockMvc.perform(post("/alunos").header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenUser)
+				.contentType(MediaType.APPLICATION_JSON).content(corpoRepetido)).andExpect(status().isConflict());
+
+		User admin = usuario(permissao("ADMIN"));
+		String corpoUsuarioRepetido = "{\"username\":\"" + admin.getUserName().toUpperCase()
+				+ "\",\"fullName\":\"Outro Nome\",\"password\":\"Senha-Boa-1234567\"}";
+		mockMvc.perform(post("/auth/register").header(HttpHeaders.AUTHORIZATION, "Bearer " + token(admin))
+				.contentType(MediaType.APPLICATION_JSON).content(corpoUsuarioRepetido)).andExpect(status().isConflict());
+	}
+
 	@Test
 	void permissaoRevogadaNoBancoValeNaProximaRequisicaoMesmoComOTokenAntigo() throws Exception {
 		Permission admin = permissao("ADMIN");

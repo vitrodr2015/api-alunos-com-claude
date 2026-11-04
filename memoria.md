@@ -83,6 +83,8 @@ Arquivo para retomar o contexto se a conversa for perdida. Ler junto com `PassoA
 - **Cuidado ao fazer release:** com o datasource, a aplicação real exige o banco no arranque. Antes do merge na `main` (deploy), o RDS `database-crud-alunos` tem de estar `Available`; se estiver parado, a tarefa cai ao subir.
 
 ## Pendências
+- **AMANHÃ (2026-11-04), PRIMEIRO ITEM, pedido do usuário:** configurar o Postman para guardar o token sozinho (na requisição do login, aba Scripts/Tests: `pm.collectionVariables.set("token", pm.response.json().accessToken);` e, nas outras, Bearer Token = `{{token}}`) e testar `GET /alunos/1`, `POST /alunos` e `DELETE /alunos/{id}` (só ADMIN; outro usuário = 403). Ambiente de AWS **desligado pelo usuário no fim de 2026-11-03** (Desired tasks = 0 e RDS parado; o RDS religa sozinho por volta de 2026-11-10): ligar de novo para testar na AWS (RDS Available, depois Desired = 1; IP novo).
+- **Depois disso:** com o login do admin confirmado na AWS (já funcionou em 2026-11-03), tirar `ADMIN_BOOTSTRAP_PASSWORD` do `task-definition.json` e novo deploy (o admin continua logando: ele já está no banco); pedir o "pode" para mesclar o PR #35 (anotações da release 1.3.0, aberto).
 
 - Decidir o destino do `HELP.md`.
 - Escolher MapStruct ou Dozer, se o usuário quiser trocar o mapper manual.
@@ -91,8 +93,8 @@ Arquivo para retomar o contexto se a conversa for perdida. Ler junto com `PassoA
 - Desligar o ambiente da AWS (Desired tasks = 0 e parar o RDS) quando o usuário terminar de testar: **está LIGADO desde a release 1.2.0**.
 - Sobras na AWS para decidir: `rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos` (sem o "i") e a política `LerSecretDB_CrudAlunos` que ficou na role errada.
 - Branches remotas: `teste-ci-quebrado` nunca foi mesclada, de propósito; `feature/autenticacao` já foi mesclada (PR #29) e só se apaga se o usuário pedir. A `release/1.2.0` já não existe mais.
-- **PILHA DE PRs DA SEGURANÇA (próxima ação): #30 `feature/autorizacao` (aberto, build verde) → `feature/cors` → `feature/endurecimento`.** Cada merge só com "pode" explícito do usuário; abrir o PR seguinte depois de cada merge (as branches já contêm as anteriores; os `.md` podem conflitar: manter as duas versões).
-- **NÃO fazer release da segurança antes de terminar o roteiro da AWS. JÁ FEITO (2026-11-03): segredo `JWT_SECRET`, permissão e `JWT_SECRET` no `task-definition.json` (falta só implantar). TAMBÉM FEITO: segredo da senha do admin criado e `ADMIN_BOOTSTRAP_PASSWORD` em `secrets` (confirmar a política IAM). FALTA: mesclar a pilha de PRs, release, e REMOVER `ADMIN_BOOTSTRAP_PASSWORD` do task-definition depois do 1º deploy.** Roteiro original: segredo `JWT_SECRET` no Secrets Manager + permissão na `ecsTaskExecutionRole` + `secrets` no `task-definition.json` (só com ARNs reais) + `ADMIN_BOOTSTRAP_PASSWORD` só no 1º deploy. Detalhes no passo 39 do `PassoAPasso.md`. Sem isso a tarefa não sobe.
+- Pilha de PRs da segurança: TODA mesclada (#29 a #32) e na `main` pela release 1.3.0.
+- **Release 1.3.0 FEITA em 2026-11-03 (tag `v1.3.0`, task definition `:8`).** Falta: o usuário confirmar o login `admin` na AWS e depois REMOVER `ADMIN_BOOTSTRAP_PASSWORD` do `task-definition.json` + novo deploy (detalhes no passo 40 do `PassoAPasso.md`).
 - Swagger/`v3/api-docs`: adiado até existir (decisão do usuário). Sem limite de tentativas de login (limitação conhecida).
 
 

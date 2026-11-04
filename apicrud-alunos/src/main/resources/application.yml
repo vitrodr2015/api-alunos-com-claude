@@ -31,3 +31,8 @@ security:
     # access token curto; refresh token mais longo (sem lista de revogação, um token vale até expirar)
     access-token-expiration: 15m
     refresh-token-expiration: 24h
+
+cors:
+  # Origens (domínios) que podem chamar a API pelo navegador, separadas por vírgula. Vazio = nenhuma (sem CORS).
+  # Nunca use '*': a aplicação não sobe. Exemplo: CORS_ALLOWED_ORIGINS=https://app.exemplo.com,http://localhost:5173
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:}

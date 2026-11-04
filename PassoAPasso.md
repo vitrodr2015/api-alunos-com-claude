@@ -728,6 +728,13 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Ainda por fazer:** (1) o usuário testar `POST /auth/signin` com `admin` e a senha do segredo (deve dar 200); (2) **remover `ADMIN_BOOTSTRAP_PASSWORD` do `task-definition.json`** e fazer novo deploy (release de correção `1.3.1` ou similar); opcionalmente apagar o segredo `admin-bootstrap-password`.
 - **2026-11-04 (release 1.3.1):** o usuário confirmou o login na AWS; `ADMIN_BOOTSTRAP_PASSWORD` foi tirado de `secrets` no `task-definition.json` e a release 1.3.1 faz o novo deploy. O segredo `admin-bootstrap-password` pode ser apagado do Secrets Manager (opcional).
 
+## 41. Release 1.3.1: a senha do primeiro admin sai da Task Definition (2026-11-04)
+
+- **Por quê:** o admin já existia no RDS (login confirmado pelo usuário na 1.3.0). O `ADMIN_BOOTSTRAP_PASSWORD` só serve para criar o primeiro admin; deixá-lo configurado expõe a senha sem necessidade. O login continua funcionando porque o usuário está no banco.
+- **Fluxo:** PR #36 (`fix/remove-admin-bootstrap` → `develop`), `release/1.3.1`, PR #37 para a `main`, deploy da esteira, tag `v1.3.1`, back-merge no PR #38. `task-definition.json` volta a ter só `DB_PASSWORD` e `JWT_SECRET` em `secrets`.
+- **Deploy:** task definition `:9`, rollout `COMPLETED`, `GET /alunos` sem token → 401 na AWS.
+- **Opcional (console):** apagar o segredo `secrets_crud_alunos/admin-bootstrap-password` e tirar seu ARN da política `LerSecretDB_CrudAlunos`. Se um dia for preciso recriar o admin, é só repetir o procedimento (só funciona se não houver nenhum ADMIN).
+
 ## Próximos passos
 > **Atualização 2026-11-03:** o usuário criou o segredo `secrets_crud_alunos/jwt-secret` e liberou a leitura na `ecsTaskExecutionRole`; `JWT_SECRET` já está em `secrets` do `task-definition.json` (branch `feature/endurecimento`, ainda não implantado). O segredo da senha do primeiro admin também foi criado e `ADMIN_BOOTSTRAP_PASSWORD` entrou em `secrets` (confirmar que a política de leitura tem o ARN). Depois do 1º deploy, REMOVER essa variável do arquivo e fazer novo deploy.
 

@@ -40,10 +40,6 @@
                 {
                     "name": "JWT_SECRET",
                     "valueFrom": "arn:aws:secretsmanager:us-east-1:164801376891:secret:secrets_crud_alunos/jwt-secret-Voadjs"
-                },
-                {
-                    "name": "ADMIN_BOOTSTRAP_PASSWORD",
-                    "valueFrom": "arn:aws:secretsmanager:us-east-1:164801376891:secret:secrets_crud_alunos/admin-bootstrap-password-RgSxMu"
                 }
             ],
             "ulimits": [],

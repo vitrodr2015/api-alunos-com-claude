@@ -18,16 +18,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
@@ -36,31 +28,9 @@ import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 
-// NÍVEL DE INTEGRAÇÃO da pirâmide: a aplicação INTEIRA (servidor de verdade, filtros de segurança ligados) falando com um
-// MySQL 8.4 REAL num contêiner, com as migrations V1 a V6 do Flyway (nada de H2, nada de data.sql, nada de ddl-auto) e
-// tokens REAIS emitidos pelo login. O primeiro administrador nasce pelo mesmo caminho da produção (AdminBootstrapRunner).
-// Exige o Docker ligado. Cada teste cria os próprios dados com nomes/e-mails únicos, então a ordem não importa.
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
-		"app.admin-bootstrap.username=admin.integracao",
-		"app.admin-bootstrap.password=Senha-Integracao-Nao-E-Real-123" })
-@Testcontainers
-class FluxoCompletoIntegrationTests {
-
-	private static final String ADMIN = "admin.integracao";
-	private static final String SENHA_ADMIN = "Senha-Integracao-Nao-E-Real-123";
-
-	@Container
-	@ServiceConnection
-	static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
-
-	@DynamicPropertySource
-	static void configurarComoProducao(DynamicPropertyRegistry registro) {
-		// o arquivo de teste usa H2 + create-drop; aqui o banco é o real, criado só pelas migrations e conferido pelo Hibernate
-		registro.add("spring.flyway.enabled", () -> "true");
-		registro.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
-		registro.add("spring.jpa.defer-datasource-initialization", () -> "false");
-		registro.add("spring.sql.init.mode", () -> "never");
-	}
+// NÍVEL DE INTEGRAÇÃO: contêiner MySQL, perfil "testcontainers" e bootstrap do admin vêm da classe base
+// (AbstractIntegrationTest). Cada teste cria os próprios dados com nomes/e-mails únicos, então a ordem não importa.
+class FluxoCompletoIntegrationTests extends AbstractIntegrationTest {
 
 	@LocalServerPort
 	private int porta;

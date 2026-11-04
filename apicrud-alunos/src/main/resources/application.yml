@@ -36,3 +36,11 @@ cors:
   # Origens (domínios) que podem chamar a API pelo navegador, separadas por vírgula. Vazio = nenhuma (sem CORS).
   # Nunca use '*': a aplicação não sobe. Exemplo: CORS_ALLOWED_ORIGINS=https://app.exemplo.com,http://localhost:5173
   allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+
+app:
+  admin-bootstrap:
+    # Criação CONTROLADA do primeiro administrador, numa execução única: defina ADMIN_BOOTSTRAP_PASSWORD (mínimo 12
+    # caracteres), suba a aplicação uma vez e REMOVA a variável. Vazio (o padrão) = desligado. Só cria se ainda não
+    # existir nenhum ADMIN. Na AWS a senha vem do Secrets Manager, nunca escrita em arquivo.
+    username: ${ADMIN_BOOTSTRAP_USERNAME:admin}
+    password: ${ADMIN_BOOTSTRAP_PASSWORD:}

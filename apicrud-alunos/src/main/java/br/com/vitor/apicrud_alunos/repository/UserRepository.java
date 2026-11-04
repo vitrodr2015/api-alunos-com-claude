@@ -13,4 +13,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 	// o nome de usuário é único sem diferenciar maiúsculas de minúsculas (no MySQL a collation já faz isso; no H2 não)
 	boolean existsByUserNameIgnoreCase(String userName);
 
+	// existe algum usuário com esta permissão? (usado para criar o primeiro administrador só uma vez)
+	boolean existsByPermissionsDescription(String description);
+
 }

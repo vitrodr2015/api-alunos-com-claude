@@ -679,10 +679,76 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Limites:** (1) o `403` de CORS é texto simples, e não o `ErrorResponse` em JSON (personalizar exigiria trocar o processador de CORS do Spring, sem ganho prático, já que o navegador não mostra o corpo); (2) CORS **não é segurança de servidor**: ele só instrui o navegador. `curl` e qualquer programa ignoram CORS, e quem protege a API continua sendo a autenticação e a autorização; (3) a lista de origens é por ambiente, então produção e desenvolvimento têm listas diferentes.
 - **Tropeços do caminho:** assumi que um pré-voo com cabeçalho proibido misturado seria barrado com 403, e o Spring responde 200 com a lista reduzida (corrigi o teste e a anotação); assumi o formato `authorization,content-type` e vem com espaço.
 
-## Próximos passos
+## 39. Segurança, parte 10: credenciais iniciais e endurecimento (passo 37 do playbook)
 
-- Continuar o playbook: o usuário cola o próximo passo (a numeração do playbook é diferente da nossa).
-- ~~Segunda release (com o banco)~~ (feita, passo 25).
-- Seções 12 a 14 do tutorial da AWS (rotina, problemas comuns, limpeza).
-- **Ambiente da AWS LIGADO** desde a release 1.2.0 (2026-11-02): RDS Available e Service com 1 tarefa. Ao terminar: Desired tasks = 0 e RDS Stopped temporarily (que religa sozinho em 7 dias). Decidir se apaga a branch `teste-ci-quebrado` e a remota `release/1.2.0`.
-- Decidir sobre as sobras na AWS (`rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos`).
+- **Status:** concluído na branch `feature/endurecimento`, a última da pilha: PR #29 (já mesclado) → PR #30 `feature/autorizacao` → `feature/cors` → `feature/endurecimento`. **Falta a parte do console da AWS** (roteiro abaixo), que é do responsável.
+- **O "pronto quando" do passo, e por que não estava pronto:** "não existe login conhecido que funcione no ambiente publicado". O usuário `admin` da `V5` tinha uma senha que foi **mostrada no chat**, ou seja, era um login conhecido que iria para o RDS na próxima release.
+- **Três itens do playbook:**
+  1. **Segredo JWT forte no gerenciador de segredos:** o código já não tem valor padrão (`security.jwt.secret: ${JWT_SECRET}`; sem a variável a aplicação não sobe, e um guarda de teste impede que alguém coloque um valor padrão). Falta criar o segredo no Secrets Manager (roteiro abaixo).
+  2. **Remover o login conhecido e criar o primeiro admin por um meio controlado:** veja abaixo.
+  3. **Swagger e `v3/api-docs`:** **adiado**. O projeto ainda não tem Swagger; por decisão do responsável, só se valida quando ele existir. Tirei esses caminhos dos testes novos. (Continua o teste do passo 34, que só confirma que as rotas de documentação não estão entre as públicas; quando o Swagger entrar, decidir se fica protegido ou desligado em produção.)
+- **Migration `V6__remove_seeded_admin.sql`** (a `V5` **não** foi editada: nunca se edita uma migration aplicada): `DELETE FROM users WHERE user_name = 'admin' AND password = '<o hash exato da V5>'`. A condição pela senha é de propósito: **só remove o usuário se ele ainda tiver a senha semeada**. Se alguém já trocou a senha dele, ele é legítimo e fica (provado). As ligações em `user_permission` saem junto (`ON DELETE CASCADE`). A V5 continua criando as permissões `ADMIN` e `USER`, de que o sistema precisa. Efeito num ambiente novo ou no RDS: a V5 cria o admin e a V6 o apaga na mesma subida do Flyway, antes de a aplicação responder a qualquer requisição.
+- **Criação controlada do primeiro administrador (`AdminBootstrapRunner`, um `ApplicationRunner`):** a ideia do playbook, "variável de ambiente numa execução única". Como usar: definir `ADMIN_BOOTSTRAP_PASSWORD` (e, se não quiser `admin`, `ADMIN_BOOTSTRAP_USERNAME`), subir uma vez e **remover a variável**. Regras:
+  - **desligado por padrão** (sem a variável não faz nada);
+  - **só cria se ainda não existir nenhum ADMIN**, então reiniciar com a variável ainda definida não recria nem troca a senha (só avisa para removê-la);
+  - a senha precisa ter **12 caracteres a 72 bytes** e **não pode ter espaço ou quebra de linha nas pontas** (o erro clássico de gravar a variável com `echo`); o nome segue `[A-Za-z0-9._@-]{3,100}`;
+  - se já existir um usuário **comum** com o nome pedido, a subida **falha** em vez de promovê-lo sem aviso;
+  - a senha **nunca aparece no log** e só é gravada como hash `{bcrypt}`;
+  - quem escolhe a senha é o responsável, e ela nunca passa pelo repositório. Na AWS ela deve vir do Secrets Manager, como a do banco, nunca escrita no `task-definition.json`.
+  - Limite conhecido: o `ApplicationRunner` roda depois de o servidor web subir; se a configuração estiver errada, a aplicação cai cerca de 0,4 s depois do `Started`. É suficiente (o contêiner não fica de pé), mas não é "antes de abrir a porta".
+- **Guardas de teste novos** (rodam em toda a esteira, para o endurecimento não se perder):
+  - `ConfigHygieneTests` (6, sem Spring, **leem os arquivos reais do projeto**): o `application.yml` tem `secret: ${JWT_SECRET}` e `password: ${DB_PASSWORD}` **sem valor padrão**; nenhuma chave que termine em `password`, `secret`, `token` ou `key` tem valor escrito (só `${VARIÁVEL}` ou `${VARIÁVEL:}` vazio; as durações `access-token-expiration` e `refresh-token-expiration` não são confundidas com segredo); CORS e o bootstrap do admin são desligados por padrão; **na `task-definition.json` nenhuma variável com cara de segredo está em `environment`** (tem que estar em `secrets`, e com ARN do Secrets Manager); **só a `V5` pode inserir em `users`** (uma migration futura que semear outro login falha o teste), a `V6` tem o **mesmo hash** da V5 (se divergirem, a V6 não removeria nada) e todo usuário semeado tem hash `{bcrypt}`;
+  - `SensitivePathsTests` (5, filtros ligados, banco de verdade): 23 caminhos sensíveis (actuator, `heapdump`, console do H2, `.env`, `.git/config`, `application.yml`, `WEB-INF`, `/error`...) dão 401 para anônimo e **403 até para o ADMIN**; métodos perigosos (`POST /actuator/shutdown`) também; cabeçalhos de segurança do Spring Security presentes (`nosniff`, `X-Frame-Options: DENY`, `Cache-Control: no-cache`, sem `X-Powered-By`, sem `WWW-Authenticate`); os erros (400, 401, 403, 404, 415, JSON quebrado, login) **nunca vazam pilha, nome de classe, pacote nem caminho de arquivo**;
+  - `AdminBootstrapRunnerTests` (10, Mockito) e `AdminBootstrapIntegrationTests` (4, aplicação inteira com saída de log capturada): cria com hash e as duas permissões; o login funciona com a senha escolhida e falha com outra; a senha não está no log; rodar de novo não recria nem troca nada; todas as validações.
+- **Os guardas pegam falha de verdade (sabotagens, depois restauradas):** runner: senha escrita no log → 2 testes quebraram; sem a checagem de "já existe ADMIN" → vários; senha curta aceita → 1; senha gravada em texto → 2. Higiene: `JWT_SECRET` com valor padrão → 2; segredo em `environment` da Task Definition → 1; hash da V6 diferente → 1; migration V7 semeando outro usuário → 1; actuator liberado → 3.
+- **Provado no banco de verdade (MySQL local):**
+  - **banco novo e vazio** (V1 a V6 do zero, o caminho que o RDS fará): termina com **0 usuários**, as permissões `ADMIN` e `USER` e os 408 alunos; o login `admin` com a senha que foi mostrada no chat dá **401**; `GET /alunos` sem token dá 401;
+  - **regra da V6** (SQL direto): `admin` com senha trocada **fica**; `admin` com a senha semeada **sai**;
+  - **primeira execução com `ADMIN_BOOTSTRAP_PASSWORD`**: cria o admin com `ADMIN` e `USER`; login com a senha escolhida 200 e com a senha "conhecida" 401; a senha não aparece no log; **reinício com a variável ainda definida**: avisa "já existe um administrador", mesmo hash, nada recriado, login continua 200; **reinício sem a variável**: o login continua funcionando;
+  - **configuração errada** (a aplicação cai com mensagem clara e não cria nada): senha com quebra de linha no fim, senha curta, nome inválido, e usuário comum já existente com o nome pedido (não é promovido: 0 ligações);
+  - banco local ao fim: `V1` a `V6`, **0 usuários**, 408 alunos. Quem quiser entrar localmente passa a usar `ADMIN_BOOTSTRAP_PASSWORD` com uma senha que escolher.
+- **Placar:** 259 testes (eram 234), `mvn -B verify` verde com `JWT_SECRET`, `DB_PASSWORD`, `CORS_ALLOWED_ORIGINS` e as variáveis do bootstrap fora do ambiente, também em ordem aleatória; `docker compose build` ok.
+- **Incidente do caminho (lição para o playbook):** uma instância antiga da aplicação, do teste no navegador, ficou viva ligada ao **banco local real** (o `timeout` do bash encerra o *wrapper* mas não a JVM no Windows). Com o DevTools reiniciando a cada arquivo novo em `src/main/resources`, ela **aplicou no `mysql-dev` as migrations das minhas sabotagens**: a `V6` verdadeira (o que apagou o admin local, fora do meu controle) e a `V7` falsa (que inseriu um usuário `outro`). Conserto: apaguei o usuário `outro` e a linha da `V7` do histórico do Flyway (era só um `INSERT`), conferi `V1` a `V6` e 408 alunos, e encerrei os 4 processos meus que sobraram. **Regras:** (1) antes de mexer em `src/main/resources` (sabotagens), garantir que nenhuma instância esteja ligada ao banco real; (2) encerrar a aplicação com um script que mata a JVM (`parar-app.ps1`), não confiar em `timeout`; (3) mutações de migration só contra um banco descartável. Também errei um detector: considerei que a aplicação "subiu" ao ver `Started`, que o Spring escreve **antes** de rodar os `ApplicationRunner`; refiz esperando a falha aparecer.
+- **ROTEIRO DA AWS (do console; nada disto foi feito) antes da primeira release com segurança.** Sem isso a tarefa **não sobe**:
+  1. **Segredo do JWT:** Secrets Manager → *Store a new secret* → *Other type of secret* → *Plaintext* → um valor aleatório de pelo menos 32 caracteres (gerar no computador com `openssl rand -hex 32` e **não** reaproveitar o da máquina local) → nome sugerido `secrets_crud_alunos/jwt-secret`.
+  2. **Senha do primeiro admin:** outro segredo, `secrets_crud_alunos/admin-bootstrap-password`, com uma senha que você escolher (12+ caracteres), guardada também num gerenciador de senhas. É só para a primeira execução.
+  3. **Permissão de leitura:** IAM → Roles → `ecsTaskExecutionRole` → a política inline `LerSecretDB_CrudAlunos` → acrescentar à lista de `Resource` os dois ARNs novos (com o `-*` no fim de cada um, como no do banco).
+  4. **Task Definition:** em `task-definition.json`, na lista `secrets`, acrescentar `JWT_SECRET` (`valueFrom` = ARN do segredo do JWT) e, **só para o primeiro deploy**, `ADMIN_BOOTSTRAP_PASSWORD` (`valueFrom` = ARN do segredo do admin). Os ARNs só existem depois de criar os segredos, por isso eu não editei o arquivo agora (um ARN inventado quebraria o deploy). `CORS_ALLOWED_ORIGINS` não é necessário (o padrão vazio é seguro).
+  5. **Ligar o ambiente:** RDS `Available` e Service com *Desired tasks* = 1 (a esteira não mexe nisso). O Flyway aplica `V4`, `V5` e `V6` no RDS e a aplicação cria o admin.
+  6. **Depois do primeiro start com sucesso:** tirar o `ADMIN_BOOTSTRAP_PASSWORD` do `task-definition.json` e fazer um novo deploy (a senha não deve ficar configurada). Opcional: apagar o segredo `admin-bootstrap-password`.
+  7. **Conferir o "pronto quando":** `POST /auth/signin` com `admin` e a senha escolhida → 200; com a senha que foi mostrada no chat → 401; `GET /alunos` sem token → 401.
+- **Limitações que continuam:** não há limite de tentativas de login nem bloqueio de conta (uma senha fraca pode ser adivinhada por força bruta); o `admin` criado tem `ADMIN` e `USER`; trocar a senha de um usuário ainda exige mexer no banco (não há endpoint para isso).
+
+## Próximos passos
+> **Atualização 2026-11-03:** o usuário criou o segredo `secrets_crud_alunos/jwt-secret` e liberou a leitura na `ecsTaskExecutionRole`; `JWT_SECRET` já está em `secrets` do `task-definition.json` (branch `feature/endurecimento`, ainda não implantado). O segredo da senha do primeiro admin também foi criado e `ADMIN_BOOTSTRAP_PASSWORD` entrou em `secrets` (confirmar que a política de leitura tem o ARN). Depois do 1º deploy, REMOVER essa variável do arquivo e fazer novo deploy.
+
+Atualizado no fim do dia 2026-11-02. A seção "COMO RETOMAR" do `memoria.md` tem a versão curta.
+
+### 1. Mesclar a pilha de PRs da segurança (a ordem importa; cada merge só com o "pode" explícito do usuário)
+
+A `develop` já tem a segurança até a **autenticação** (PRs #27 e #29, 200 testes). Faltam três branches empilhadas, cada uma sobre a anterior:
+
+| Ordem | Branch | O que traz | Estado |
+| --- | --- | --- | --- |
+| 1 | `feature/autorizacao` (PR #30) | quem pode o quê, regra final `denyAll` | PR aberto, `build` verde |
+| 2 | `feature/cors` | CORS por origens configuradas, vazio por padrão | branch no GitHub |
+| 3 | `feature/endurecimento` | `V6`, primeiro admin por variável de ambiente, guardas de teste | branch no GitHub |
+
+Cada uma já contém as anteriores (foram juntadas com `merge`, sem reescrever história). Depois de mesclar a #30, abrir o PR da próxima; as anotações (`PassoAPasso.md` e `memoria.md`) podem dar conflito entre elas: manter as duas versões.
+
+### 2. NÃO fazer release da segurança antes disto (a tarefa na AWS não sobe sem o `JWT_SECRET`)
+
+O roteiro completo está no passo 39. Resumo: segredo do JWT e segredo da senha do primeiro admin no Secrets Manager; permissão de leitura na `ecsTaskExecutionRole`; `JWT_SECRET` (e, só no primeiro deploy, `ADMIN_BOOTSTRAP_PASSWORD`) em `secrets` no `task-definition.json`, **só depois de existirem os ARNs**; depois do primeiro start, tirar o bootstrap. Tudo isso é do console da AWS. O perfil `crud-alunos` da CLI não tem permissão de Secrets Manager nem de IAM.
+
+### 3. Continuar o playbook
+
+O usuário cola o próximo passo, um de cada vez (a numeração do playbook é diferente da nossa). O que vem depois do CORS e do endurecimento é o "Passo 38 do playbook" (testes de segurança que faltam). O 403 de rotas de dados, o 401 de tokens ruins e o login já têm teste.
+
+### 4. Pendências de antes
+
+- **Ambiente da AWS LIGADO** (RDS e Service) desde a release 1.2.0; ao terminar, *Desired tasks* = 0 e RDS *Stop temporarily*. O RDS parado religa sozinho após 7 dias (previsto por volta de **2026-11-09**).
+- Swagger e `v3/api-docs`: adiado até o Swagger existir (decisão do usuário).
+- Seções 12 a 14 do tutorial da AWS (rotina, problemas comuns, limpeza): ainda não executadas.
+- Sobras na AWS: `rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos` (sem o "i") e a política `LerSecretDB_CrudAlunos` que ficou numa role errada.
+- Branches remotas já mescladas que podem ser apagadas **quando o usuário pedir**: `feature/autenticacao`. A `teste-ci-quebrado` nunca foi mesclada, de propósito.
+- Limitações de segurança conhecidas: sem limite de tentativas de login nem bloqueio de conta; não há endpoint para trocar senha nem para dar `ADMIN` a outro usuário (só pelo banco).

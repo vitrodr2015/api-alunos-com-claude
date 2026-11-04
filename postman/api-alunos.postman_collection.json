@@ -1,10 +1,226 @@
 {
   "info": {
     "name": "API Alunos",
-    "description": "CRUD de alunos (apicrud-alunos). Selecione o ambiente \"API Alunos - Local\" e suba a aplicação com .\\mvnw.cmd spring-boot:run.",
+    "description": "CRUD de alunos (apicrud-alunos). Selecione o ambiente \"API Alunos - Local\" e suba a aplicação com .\\mvnw.cmd spring-boot:run.\n\nAutenticação: rode a pasta \"00 - Autenticação\" primeiro. O token vai em {{token}} (Bearer, herdado da coleção); expira em 15 minutos: rode o \"02 - Renovar\" ou o login de novo.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
+    {
+      "name": "00 - Autenticação (rodar primeiro)",
+      "description": "Preencha adminUser e adminPassword no ambiente. O login do admin guarda {{token}} e {{refreshToken}}; as demais pastas usam {{token}} (herdado da coleção).",
+      "item": [
+        {
+          "name": "01 - Login do admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "signin"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{adminUser}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Guarda o accessToken em {{token}} e o refreshToken em {{refreshToken}} (o access vale 15 minutos)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Resposta sem cache', () => pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'));",
+                  "pm.test('Tem os dois tokens', () => {",
+                  "  const t = pm.response.json();",
+                  "  pm.expect(t.tokenType).to.eql('Bearer');",
+                  "  pm.expect(t.accessToken).to.be.a(\"string\").and.not.empty;",
+                  "  pm.expect(t.refreshToken).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.environment.set('token', pm.response.json().accessToken);",
+                  "pm.environment.set('refreshToken', pm.response.json().refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Renovar o token (refresh)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Troca o refresh token por um par novo. Use quando o access token vencer (15 minutos)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Veio um par novo', () => { const t = pm.response.json(); pm.expect(t.accessToken).to.be.a('string').and.not.empty; pm.expect(t.refreshToken).to.be.a('string').and.not.empty; });",
+                  "pm.environment.set('token', pm.response.json().accessToken);",
+                  "pm.environment.set('refreshToken', pm.response.json().refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Registrar um usuário comum (só ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{novoUsuario}}\",\n  \"fullName\": \"Usuário de Teste\",\n  \"password\": \"{{novaSenha}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Cria um usuário só com a permissão USER (o admin é quem cadastra). Nome e senha são gerados a cada execução."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const sufixo = Date.now();",
+                  "pm.environment.set('novoUsuario', 'usuario.' + sufixo);",
+                  "pm.environment.set('novaSenha', 'Senha-' + sufixo + '-Teste');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Nasce só com USER e sem a senha na resposta', () => {",
+                  "  const u = pm.response.json();",
+                  "  pm.expect(u.permissions).to.eql(['USER']);",
+                  "  pm.expect(JSON.stringify(u)).to.not.include('password');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Login do usuário comum",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "signin"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{novoUsuario}}\",\n  \"password\": \"{{novaSenha}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Guarda o token do usuário comum em {{tokenUser}} (sem mexer no do admin), para os testes de 403."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.environment.set('tokenUser', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
     {
       "name": "0 - Carga inicial (10 alunos)",
       "description": "Cria 10 alunos de exemplo. Pode rodar de novo: o que já existe responde 409.",
@@ -1251,18 +1467,18 @@
           }
         },
         {
-          "name": "404 - Rota inexistente",
+          "name": "403 - Rota inexistente (negada por padrão, regra denyAll)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Status 403', () => pm.response.to.have.status(403));",
                   "pm.test('Corpo no formato ErrorResponse', () => {",
                   "  const corpo = pm.response.json();",
                   "  pm.expect(corpo).to.have.all.keys('dataHora', 'status', 'erro', 'mensagem');",
-                  "  pm.expect(corpo.status).to.eql(404);",
+                  "  pm.expect(corpo.status).to.eql(403);",
                   "});"
                 ]
               }
@@ -1283,18 +1499,18 @@
           }
         },
         {
-          "name": "405 - POST em /alunos/1",
+          "name": "403 - POST em /alunos/1 (sem regra: negado por padrão)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status 405', () => pm.response.to.have.status(405));",
+                  "pm.test('Status 403', () => pm.response.to.have.status(403));",
                   "pm.test('Corpo no formato ErrorResponse', () => {",
                   "  const corpo = pm.response.json();",
                   "  pm.expect(corpo).to.have.all.keys('dataHora', 'status', 'erro', 'mensagem');",
-                  "  pm.expect(corpo.status).to.eql(405);",
+                  "  pm.expect(corpo.status).to.eql(403);",
                   "});"
                 ]
               }
@@ -1423,6 +1639,561 @@
           }
         }
       ]
+    },
+    {
+      "name": "3 - Segurança (401 e 403)",
+      "description": "Rode DEPOIS da pasta de autenticação. 401 = sem login ou login inválido; 403 = logado, mas sem permissão.",
+      "item": [
+        {
+          "name": "401 - GET /alunos sem token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alunos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alunos"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Corpo no formato ErrorResponse', () => {",
+                  "  const corpo = pm.response.json();",
+                  "  pm.expect(corpo).to.have.all.keys('dataHora', 'status', 'erro', 'mensagem');",
+                  "  pm.expect(corpo.status).to.eql(401);",
+                  "});",
+                  "pm.test('Não vaza pilha nem nomes de classe', () => pm.expect(pm.response.text()).to.not.match(/Exception|br\\.com\\.vitor|org\\.springframework|\\sat\\s/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 - GET /alunos com token inválido",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alunos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alunos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "isto-nao-e-um-token",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Corpo no formato ErrorResponse', () => {",
+                  "  const corpo = pm.response.json();",
+                  "  pm.expect(corpo).to.have.all.keys('dataHora', 'status', 'erro', 'mensagem');",
+                  "  pm.expect(corpo.status).to.eql(401);",
+                  "});",
+                  "pm.test('Não vaza pilha nem nomes de classe', () => pm.expect(pm.response.text()).to.not.match(/Exception|br\\.com\\.vitor|org\\.springframework|\\sat\\s/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 - refresh token não vale como access token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alunos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alunos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{refreshToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "O refresh token só serve para renovar; usá-lo nas rotas dá 401."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Corpo no formato ErrorResponse', () => {",
+                  "  const corpo = pm.response.json();",
+                  "  pm.expect(corpo).to.have.all.keys('dataHora', 'status', 'erro', 'mensagem');",
+                  "  pm.expect(corpo.status).to.eql(401);",
+                  "});",
+                  "pm.test('Não vaza pilha nem nomes de classe', () => pm.expect(pm.response.text()).to.not.match(/Exception|br\\.com\\.vitor|org\\.springframework|\\sat\\s/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 - Login com senha errada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "signin"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"senha-errada-123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Corpo no formato ErrorResponse', () => {",
+                  "  const corpo = pm.response.json();",
+                  "  pm.expect(corpo).to.have.all.keys('dataHora', 'status', 'erro', 'mensagem');",
+                  "  pm.expect(corpo.status).to.eql(401);",
+                  "});",
+                  "pm.test('Não vaza pilha nem nomes de classe', () => pm.expect(pm.response.text()).to.not.match(/Exception|br\\.com\\.vitor|org\\.springframework|\\sat\\s/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 - Login com usuário que não existe (mesma resposta)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "signin"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"ninguem.assim\",\n  \"password\": \"senha-errada-123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Corpo no formato ErrorResponse', () => {",
+                  "  const corpo = pm.response.json();",
+                  "  pm.expect(corpo).to.have.all.keys('dataHora', 'status', 'erro', 'mensagem');",
+                  "  pm.expect(corpo.status).to.eql(401);",
+                  "});",
+                  "pm.test('Não vaza pilha nem nomes de classe', () => pm.expect(pm.response.text()).to.not.match(/Exception|br\\.com\\.vitor|org\\.springframework|\\sat\\s/));",
+                  "pm.test('Mensagem igual à da senha errada (não revela se o usuário existe)', () => pm.expect(pm.response.json().mensagem).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 - Refresh com token inválido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"isto-nao-e-um-token\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Corpo no formato ErrorResponse', () => {",
+                  "  const corpo = pm.response.json();",
+                  "  pm.expect(corpo).to.have.all.keys('dataHora', 'status', 'erro', 'mensagem');",
+                  "  pm.expect(corpo.status).to.eql(401);",
+                  "});",
+                  "pm.test('Não vaza pilha nem nomes de classe', () => pm.expect(pm.response.text()).to.not.match(/Exception|br\\.com\\.vitor|org\\.springframework|\\sat\\s/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 - /auth/register sem token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"qualquer.um\",\n  \"fullName\": \"Qualquer Um\",\n  \"password\": \"Senha-Boa-123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Corpo no formato ErrorResponse', () => {",
+                  "  const corpo = pm.response.json();",
+                  "  pm.expect(corpo).to.have.all.keys('dataHora', 'status', 'erro', 'mensagem');",
+                  "  pm.expect(corpo.status).to.eql(401);",
+                  "});",
+                  "pm.test('Não vaza pilha nem nomes de classe', () => pm.expect(pm.response.text()).to.not.match(/Exception|br\\.com\\.vitor|org\\.springframework|\\sat\\s/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "200 - Usuário comum LISTA alunos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alunos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alunos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenUser}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "403 - Usuário comum NÃO apaga aluno",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alunos/{{alunoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alunos",
+                "{{alunoId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenUser}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "DELETE é só do ADMIN. Falha com 403 antes de procurar o aluno."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Corpo no formato ErrorResponse', () => {",
+                  "  const corpo = pm.response.json();",
+                  "  pm.expect(corpo).to.have.all.keys('dataHora', 'status', 'erro', 'mensagem');",
+                  "  pm.expect(corpo.status).to.eql(403);",
+                  "});",
+                  "pm.test('Não vaza pilha nem nomes de classe', () => pm.expect(pm.response.text()).to.not.match(/Exception|br\\.com\\.vitor|org\\.springframework|\\sat\\s/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "403 - Usuário comum NÃO registra usuários",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"outro.usuario\",\n  \"fullName\": \"Outro Usuário\",\n  \"password\": \"Senha-Boa-123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenUser}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Corpo no formato ErrorResponse', () => {",
+                  "  const corpo = pm.response.json();",
+                  "  pm.expect(corpo).to.have.all.keys('dataHora', 'status', 'erro', 'mensagem');",
+                  "  pm.expect(corpo.status).to.eql(403);",
+                  "});",
+                  "pm.test('Não vaza pilha nem nomes de classe', () => pm.expect(pm.response.text()).to.not.match(/Exception|br\\.com\\.vitor|org\\.springframework|\\sat\\s/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 - /actuator/env sem token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/env",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "env"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Corpo no formato ErrorResponse', () => {",
+                  "  const corpo = pm.response.json();",
+                  "  pm.expect(corpo).to.have.all.keys('dataHora', 'status', 'erro', 'mensagem');",
+                  "  pm.expect(corpo.status).to.eql(401);",
+                  "});",
+                  "pm.test('Não vaza pilha nem nomes de classe', () => pm.expect(pm.response.text()).to.not.match(/Exception|br\\.com\\.vitor|org\\.springframework|\\sat\\s/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "403 - /actuator/env negado até para o ADMIN",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/env",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "env"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Corpo no formato ErrorResponse', () => {",
+                  "  const corpo = pm.response.json();",
+                  "  pm.expect(corpo).to.have.all.keys('dataHora', 'status', 'erro', 'mensagem');",
+                  "  pm.expect(corpo.status).to.eql(403);",
+                  "});",
+                  "pm.test('Não vaza pilha nem nomes de classe', () => pm.expect(pm.response.text()).to.not.match(/Exception|br\\.com\\.vitor|org\\.springframework|\\sat\\s/));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
-  ]
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  }
 }

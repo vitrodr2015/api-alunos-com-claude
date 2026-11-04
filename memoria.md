@@ -85,6 +85,7 @@ Arquivo para retomar o contexto se a conversa for perdida. Ler junto com `PassoA
 ## Pendências
 - **AMANHÃ (2026-11-04), PRIMEIRO ITEM, pedido do usuário:** configurar o Postman para guardar o token sozinho (na requisição do login, aba Scripts/Tests: `pm.collectionVariables.set("token", pm.response.json().accessToken);` e, nas outras, Bearer Token = `{{token}}`) e testar `GET /alunos/1`, `POST /alunos` e `DELETE /alunos/{id}` (só ADMIN; outro usuário = 403). Ambiente de AWS **desligado pelo usuário no fim de 2026-11-03** (Desired tasks = 0 e RDS parado; o RDS religa sozinho por volta de 2026-11-10): ligar de novo para testar na AWS (RDS Available, depois Desired = 1; IP novo).
 - **Release 1.3.1 FEITA em 2026-11-04 (tag `v1.3.1`, task definition `:9`):** `ADMIN_BOOTSTRAP_PASSWORD` removido do `task-definition.json`; o admin continua logando. Configuração do token no Postman: item do usuário. AWS LIGADA (RDS e Service) desde 2026-11-04.
+- **Postman (2026-11-04, branch `feature/postman-seguranca`):** coleção com login automático (Bearer `{{token}}`), pasta de autenticação e pasta de segurança (401/403); ambientes local e AWS; `adminPassword` fica vazio no arquivo (preencher no Postman). Validada com newman (105 asserções).
 
 - Decidir o destino do `HELP.md`.
 - Escolher MapStruct ou Dozer, se o usuário quiser trocar o mapper manual.

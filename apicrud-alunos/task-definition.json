@@ -36,6 +36,10 @@
                 {
                     "name": "DB_PASSWORD",
                     "valueFrom": "arn:aws:secretsmanager:us-east-1:164801376891:secret:secrets_crud_alunos/db-password-YxLWlR"
+                },
+                {
+                    "name": "JWT_SECRET",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-1:164801376891:secret:secrets_crud_alunos/jwt-secret-Voadjs"
                 }
             ],
             "ulimits": [],

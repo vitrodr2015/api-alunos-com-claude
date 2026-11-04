@@ -91,7 +91,7 @@ Arquivo para retomar o contexto se a conversa for perdida. Ler junto com `PassoA
 - Desligar o ambiente da AWS (Desired tasks = 0 e parar o RDS) quando o usuário terminar de testar: **está LIGADO desde a release 1.2.0**.
 - Sobras na AWS para decidir: `rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos` (sem o "i") e a política `LerSecretDB_CrudAlunos` que ficou na role errada.
 - Branches remotas: `teste-ci-quebrado` nunca foi mesclada, de propósito; `feature/autenticacao` já foi mesclada (PR #29) e só se apaga se o usuário pedir. A `release/1.2.0` já não existe mais.
-- **PILHA DE PRs DA SEGURANÇA (próxima ação): #30 `feature/autorizacao` (aberto, build verde) → `feature/cors` → `feature/endurecimento`.** Cada merge só com "pode" explícito do usuário; abrir o PR seguinte depois de cada merge (as branches já contêm as anteriores; os `.md` podem conflitar: manter as duas versões).
+- Pilha de PRs da segurança: TODA mesclada (#29 a #32) e na `main` pela release 1.3.0.
 - **Release 1.3.0 FEITA em 2026-11-03 (tag `v1.3.0`, task definition `:8`).** Falta: o usuário confirmar o login `admin` na AWS e depois REMOVER `ADMIN_BOOTSTRAP_PASSWORD` do `task-definition.json` + novo deploy (detalhes no passo 40 do `PassoAPasso.md`).
 - Swagger/`v3/api-docs`: adiado até existir (decisão do usuário). Sem limite de tentativas de login (limitação conhecida).
 

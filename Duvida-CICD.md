@@ -59,6 +59,7 @@
 | Release 1.3.0 (segurança) | ✅ Deploy em 2026-11-03: task definition `:8`, rollout COMPLETED. Pendente: confirmar o login e remover `ADMIN_BOOTSTRAP_PASSWORD` da Task Definition |
 | Release 1.3.1 | ✅ 2026-11-04: `ADMIN_BOOTSTRAP_PASSWORD` tirado da Task Definition; task definition `:9`, rollout COMPLETED. Opcional pendente: apagar o segredo `admin-bootstrap-password` e seu ARN na política |
 | Swagger na AWS | ⏳ **Não ligado** (decisão do usuário). A aplicação traz o Swagger desligado por padrão; para ligar, `SWAGGER_ENABLED=true` em `environment` da Task Definition + release. Nada foi alterado na AWS |
+| Health check na AWS | ⏳ **Não configurado** (nada foi alterado na AWS). O código já tem `/actuator/health/liveness`; a imagem não tem `curl`/`wget`, então o `healthCheck` dentro do contêiner não foi ligado. Com um ALB, apontar o *target group* para `/actuator/health/liveness` |
 
 ---
 

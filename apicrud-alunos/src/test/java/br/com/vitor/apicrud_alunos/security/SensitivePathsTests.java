@@ -38,7 +38,8 @@ class SensitivePathsTests {
 			"/actuator", "/actuator/health", "/actuator/env", "/actuator/beans", "/actuator/heapdump", "/actuator/mappings",
 			"/h2-console", "/h2-console/", "/console",
 			"/.env", "/.git/config", "/application.yml", "/application.properties", "/WEB-INF/web.xml", "/server-status",
-			"/error");
+			"/error",
+			"/swagger-ui/index.html", "/swagger-ui.html", "/v3/api-docs", "/v3/api-docs/alunos", "/v3/api-docs/swagger-config");
 
 	@Autowired
 	private MockMvc mockMvc;

@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import br.com.vitor.apicrud_alunos.controller.docs.AuthControllerDocs;
 import br.com.vitor.apicrud_alunos.dto.RefreshRequest;
 import br.com.vitor.apicrud_alunos.dto.RegisterRequest;
 import br.com.vitor.apicrud_alunos.dto.SignInRequest;
@@ -21,7 +22,7 @@ import jakarta.validation.Valid;
 // signin e refresh são públicos; register é exclusivo de ADMIN (regra na SecurityConfig).
 @RestController
 @RequestMapping(value = "/auth", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-public class AuthController {
+public class AuthController implements AuthControllerDocs {
 
 	private final AuthService service;
 
@@ -30,16 +31,19 @@ public class AuthController {
 	}
 
 	@PostMapping("/signin")
+	@Override
 	public ResponseEntity<TokenResponse> signIn(@Valid @RequestBody SignInRequest pedido) {
 		return semCache(TokenResponse.from(service.signIn(pedido.username(), pedido.password())));
 	}
 
 	@PostMapping("/refresh")
+	@Override
 	public ResponseEntity<TokenResponse> refresh(@Valid @RequestBody RefreshRequest pedido) {
 		return semCache(TokenResponse.from(service.refresh(pedido.refreshToken())));
 	}
 
 	@PostMapping("/register")
+	@Override
 	public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest pedido) {
 		return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(service.register(pedido)));
 	}

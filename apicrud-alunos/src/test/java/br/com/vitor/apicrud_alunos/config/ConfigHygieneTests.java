@@ -69,6 +69,17 @@ class ConfigHygieneTests {
 		assertThat(yml).contains("password: ${ADMIN_BOOTSTRAP_PASSWORD:}");
 	}
 
+	// a documentação (Swagger) só abre quando alguém liga SWAGGER_ENABLED=true; o padrão é desligado
+	@Test
+	void oSwaggerNasceDesligadoPorPadrao() throws IOException {
+		String yml = ler(APPLICATION_YML);
+
+		assertThat(yml).contains("enabled: ${SWAGGER_ENABLED:false}");
+		// as duas chaves (api-docs e swagger-ui) usam o mesmo interruptor, sem outro valor padrão
+		assertThat(yml.split(Pattern.quote("${SWAGGER_ENABLED")).length - 1).isEqualTo(2);
+		assertThat(yml).doesNotContain("SWAGGER_ENABLED:true");
+	}
+
 	// ---------- task-definition.json (versionado: vai para a AWS) ----------
 
 	@Test

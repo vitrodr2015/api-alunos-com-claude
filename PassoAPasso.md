@@ -686,7 +686,7 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Três itens do playbook:**
   1. **Segredo JWT forte no gerenciador de segredos:** o código já não tem valor padrão (`security.jwt.secret: ${JWT_SECRET}`; sem a variável a aplicação não sobe, e um guarda de teste impede que alguém coloque um valor padrão). Falta criar o segredo no Secrets Manager (roteiro abaixo).
   2. **Remover o login conhecido e criar o primeiro admin por um meio controlado:** veja abaixo.
-  3. **Swagger e `v3/api-docs`:** **adiado**. O projeto ainda não tem Swagger; por decisão do responsável, só se valida quando ele existir. Tirei esses caminhos dos testes novos. (Continua o teste do passo 34, que só confirma que as rotas de documentação não estão entre as públicas; quando o Swagger entrar, decidir se fica protegido ou desligado em produção.)
+  3. **Swagger e `v3/api-docs`:** **adiado** (feito depois, no passo 44). O projeto ainda não tem Swagger; por decisão do responsável, só se valida quando ele existir. Tirei esses caminhos dos testes novos. (Continua o teste do passo 34, que só confirma que as rotas de documentação não estão entre as públicas; quando o Swagger entrar, decidir se fica protegido ou desligado em produção.)
 - **Migration `V6__remove_seeded_admin.sql`** (a `V5` **não** foi editada: nunca se edita uma migration aplicada): `DELETE FROM users WHERE user_name = 'admin' AND password = '<o hash exato da V5>'`. A condição pela senha é de propósito: **só remove o usuário se ele ainda tiver a senha semeada**. Se alguém já trocou a senha dele, ele é legítimo e fica (provado). As ligações em `user_permission` saem junto (`ON DELETE CASCADE`). A V5 continua criando as permissões `ADMIN` e `USER`, de que o sistema precisa. Efeito num ambiente novo ou no RDS: a V5 cria o admin e a V6 o apaga na mesma subida do Flyway, antes de a aplicação responder a qualquer requisição.
 - **Criação controlada do primeiro administrador (`AdminBootstrapRunner`, um `ApplicationRunner`):** a ideia do playbook, "variável de ambiente numa execução única". Como usar: definir `ADMIN_BOOTSTRAP_PASSWORD` (e, se não quiser `admin`, `ADMIN_BOOTSTRAP_USERNAME`), subir uma vez e **remover a variável**. Regras:
   - **desligado por padrão** (sem a variável não faz nada);
@@ -728,36 +728,77 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Ainda por fazer:** (1) o usuário testar `POST /auth/signin` com `admin` e a senha do segredo (deve dar 200); (2) **remover `ADMIN_BOOTSTRAP_PASSWORD` do `task-definition.json`** e fazer novo deploy (release de correção `1.3.1` ou similar); opcionalmente apagar o segredo `admin-bootstrap-password`.
 - **2026-11-04 (release 1.3.1):** o usuário confirmou o login na AWS; `ADMIN_BOOTSTRAP_PASSWORD` foi tirado de `secrets` no `task-definition.json` e a release 1.3.1 faz o novo deploy. O segredo `admin-bootstrap-password` pode ser apagado do Secrets Manager (opcional).
 
+## 41. Release 1.3.1: a senha do primeiro admin sai da Task Definition (2026-11-04)
+
+- **Por quê:** o admin já existia no RDS (login confirmado pelo usuário na 1.3.0). O `ADMIN_BOOTSTRAP_PASSWORD` só serve para criar o primeiro admin; deixá-lo configurado expõe a senha sem necessidade. O login continua funcionando porque o usuário está no banco.
+- **Fluxo:** PR #36 (`fix/remove-admin-bootstrap` → `develop`), `release/1.3.1`, PR #37 para a `main`, deploy da esteira, tag `v1.3.1`, back-merge no PR #38. `task-definition.json` volta a ter só `DB_PASSWORD` e `JWT_SECRET` em `secrets`.
+- **Deploy:** task definition `:9`, rollout `COMPLETED`, `GET /alunos` sem token → 401 na AWS.
+- **Opcional (console):** apagar o segredo `secrets_crud_alunos/admin-bootstrap-password` e tirar seu ARN da política `LerSecretDB_CrudAlunos`. Se um dia for preciso recriar o admin, é só repetir o procedimento (só funciona se não houver nenhum ADMIN).
+## 42. Coleções do Postman com autenticação (2026-11-04)
+
+- **Arquivos** (pasta `postman/`): `api-alunos.postman_collection.json` (a coleção, atualizada), `api-alunos-local.postman_environment.json` e `api-alunos-aws.postman_environment.json` (novo). Importar os três no Postman e escolher o ambiente no canto superior direito.
+- **Coleção:** pasta nova **`00 - Autenticação (rodar primeiro)`** (login do admin, renovar token, registrar usuário comum, login do usuário comum) e pasta nova **`3 - Segurança (401 e 403)`** (12 requisições: sem token, token inválido, refresh como access, login errado, 403 do usuário comum no DELETE e no register, actuator). Autenticação **Bearer `{{token}}` herdada da coleção**: o login guarda o token sozinho (`pm.environment.set`), sem copiar e colar.
+- **Ambientes:** preencher **`adminPassword`** (campo secreto, vem vazio de propósito: a senha nunca vai para o repositório) e, no da AWS, trocar `baseUrl` pelo IP público atual (`http://<IP>:8080`, muda a cada tarefa). O access token vale 15 minutos: rodar o "02 - Renovar" ou o login de novo.
+- **Duas requisições antigas mudaram de expectativa** por causa da regra `denyAll`: rota inexistente e `POST /alunos/1` agora dão **403** (antes 404 e 405).
+- **Verificado:** coleção inteira rodada com o `newman` contra a aplicação local num banco descartável, 52 requisições e 105 asserções sem falha, duas rodadas seguidas (a coleção se mantém sozinha); a senha do admin não aparece no log; o banco `crud_alunos` ficou intacto (408 alunos).
+- **Ordem sugerida:** `00` (sempre primeiro) → `0` (carga, opcional) → `1` → `2` → `3`.
+
+## 43. Pirâmide de testes: nível de integração com MySQL real (passo 38 do playbook)
+
+- **Status:** concluído na branch `feature/piramide-testes`. 274 testes (eram 259). Os níveis unitário, web e segurança já existiam (passos 23, 12, 33 e 34); este passo acrescentou o **nível de integração** e conferiu a pirâmide inteira.
+- **Nível novo:** `integration/FluxoCompletoIntegrationTests` (14 testes). Sobe a **aplicação inteira** (servidor de verdade, filtros ligados) contra um **MySQL 8.4 real em contêiner** (Testcontainers), com as migrations **V1 a V6 do Flyway** (sem H2, sem `data.sql`, `ddl-auto: validate`), chamada por **REST Assured** e com **tokens reais** emitidos pelo login. O primeiro admin nasce pelo mesmo caminho da produção (`AdminBootstrapRunner`). Cada teste usa nomes e e-mails únicos, então a ordem não importa.
+- **Estrutura (ajuste do passo 39 do playbook):** classe base `integration/AbstractIntegrationTest` com **um único contêiner MySQL** (`@ServiceConnection`, sobe uma vez e o Ryuk o remove no fim da JVM; as próximas classes de integração só estendem a base) e o perfil `testcontainers` (`src/test/resources/application-testcontainers.yml`: Flyway **ligado**, `ddl-auto: validate`, sem `data.sql`). Sabotado: com o Flyway desligado no perfil, o contexto nem sobe (o validate não acha as tabelas). Os tokens dos testes REST são os **reais do login** e os **forjados no teste** (vencido, adulterado, outro segredo, tipo errado).
+- **Dependências novas (só de teste):** `spring-boot-testcontainers`, `testcontainers-junit-jupiter` e `testcontainers-mysql` (versão 2.0.5 do BOM do Spring Boot) e `rest-assured` **6.0.0** (fixada no `pom.xml`; funcionou com Jackson 3 e Java 25 porque o corpo e a leitura usam texto e JsonPath). **Exige o Docker ligado**, também na esteira (o runner `ubuntu-latest` do GitHub já tem). Leva cerca de 40 s a mais por build.
+- **O que o nível cobre:**
+  - **Banco real:** as 6 migrations rodaram com sucesso, permissões `ADMIN` e `USER`, o `admin` semeado pela V5 **não existe mais**, o único admin é o do bootstrap com hash `{bcrypt}`, a carga de 408+ alunos.
+  - **Caso feliz:** login, criar, buscar, listar paginado, filtrar, atualizar, desativar, reativar, apagar; renovar token; usuário comum cadastrado pelo admin (só `USER`, hash no banco, senha não devolvida).
+  - **400:** corpo vazio, JSON quebrado, id zero e não numérico, `sort` inválido, login em branco. **404:** aluno inexistente em GET, DELETE e PATCH. **409:** e-mail repetido **inclusive em maiúsculas (regra do MySQL real)** e nome de usuário repetido.
+  - **401:** sem token (várias rotas), senha errada, usuário inexistente, **a senha antiga semeada**, token adulterado, vencido, assinado com outro segredo, do tipo errado (refresh como access e access como refresh), lixo, e usuário que não existe no banco.
+  - **403:** usuário comum no `DELETE` (e nada foi apagado) e no `/auth/register`; rotas sem regra e caminhos sensíveis negados até para o ADMIN; erros que não vazam detalhes internos.
+- **Matriz da pirâmide (por evidência nos testes):**
+
+| Nível | Ferramenta | Banco | Feliz | 400 | 404 | 401 | 403 | 409 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Unitário (service) | JUnit 5 + Mockito | nenhum | sim | sim | sim | sim (credenciais) | **não se aplica** | sim |
+| Web (controller) | MockMvc, filtros off nos testes de contrato | H2 | sim | sim | sim | sim (`AuthControllerTests`, filtros ligados) | sim (idem) | sim |
+| Segurança | MockMvc, filtros ligados | H2 | sim | sim | sim | sim | sim | sim (**novo**: `AuthorizationTests`) |
+| Integração | Testcontainers + REST Assured | MySQL 8.4 | sim | sim | sim | sim | sim | sim |
+
+  - **403 no service não se aplica:** a autorização mora no `SecurityConfig` (por rota), não nos services; o service não decide quem pode. Está coberto onde a decisão acontece (segurança, web e integração).
+  - **Lacuna achada e fechada:** a camada de segurança não tinha o 409; entrou `quemTemPermissaoVeOs409DeNegocioNormalmente` (e-mail e nome de usuário repetidos, com filtros ligados).
+  - Os testes de contrato (`AlunoControllerTests`) rodam com filtros desligados de propósito e por isso não têm 401/403; essas respostas são testadas em `AuthControllerTests`, `SecurityErrorHandlersTests` e `AuthorizationTests`.
+- **Sabotagens (as 3 detectadas, código restaurado):** permitir o `DELETE` ao USER → 3 falhas (inclusive o 403); a V6 deixar de apagar o admin semeado → 6+ falhas (o bootstrap não cria o admin e a verificação de migrations falha); deixar de conferir o tipo do token → 1 falha (refresh aceito como access). *A nova prova de 409 na camada de segurança não foi sabotada.*
+- **Fragilidade conhecida:** alguns testes de integração leem a carga inicial (`/alunos/1`, mais de 408 alunos). Se a V2/V3 mudar, ajustar.
+
+## 44. Swagger / OpenAPI (passo 41 do playbook)
+
+- **Status:** concluído na branch `feature/swagger`. 285 testes (eram 274). Resolve o item "Swagger adiado" dos passos 37/39.
+- **Decisão de projeto (a confirmar com o responsável):** o Swagger **nasce DESLIGADO**. `SWAGGER_ENABLED` (padrão `false`) controla `springdoc.api-docs.enabled` e `springdoc.swagger-ui.enabled`. Ligado, as rotas da documentação (`GET /v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html`) ficam **públicas** (a tela precisa carregar antes do login); chamar a API continua exigindo o token. Desligado, elas caem na regra final e dão **401** (anônimo) e **403** (até para o ADMIN), como qualquer rota sem regra. **Na AWS ele continua desligado**, porque o `task-definition.json` não define `SWAGGER_ENABLED`. Para ligar localmente: `SWAGGER_ENABLED=true`.
+- **Dependência:** `springdoc-openapi-starter-webmvc-ui` **3.2.0** (única nova, fixada no `pom.xml`; funcionou com Spring Boot 4.1.2 e Java 25).
+- **Configuração (`config/OpenApiConfig`):** título "API de Alunos", versão **v1** (a do contrato da API, não a da release), descrição com **como autenticar** (passo a passo do botão Authorize), **quem pode o quê**, **formatos de resposta** (HAL, `_embedded.alunos`, `_links`, `page`, formato de erro), **paginação e ordenação** (tamanho 20/máximo 50; campos `id`, `nome`, `email`, `dataNascimento`, `ativo`) e filtros; esquema de segurança **`bearerAuth`** (HTTP Bearer JWT), aplicado a todas as rotas, **anulado em `/auth/signin` e `/auth/refresh`** (`@SecurityRequirements` vazio: sem cadeado); **dois grupos** (`GroupedOpenApi`): **Alunos** (`/alunos/**`) e **Autenticação** (`/auth/**`).
+- **Padrão de interfaces (`controller/docs`):** `AlunoControllerDocs` e `AuthControllerDocs` concentram `@Tag`, `@Operation`, `@ApiResponse` (200/201/204/400/401/403/404/409, com o formato `ErrorResponse`) e `@Parameter`; o controller só **implementa** a interface (`@Override` nos 10 métodos) e fica com a lógica. As anotações de parâmetro do Spring (`@RequestParam`, `@PathVariable`, `@RequestBody`) continuam no controller; as de documentação chegam às rotas pela interface (provado pelo teste e na tela). Os DTOs de entrada ganharam `@Schema` com descrição e exemplos (nome, e-mail, data), **sem exemplo de senha**.
+- **Testes novos/alterados:** `config/OpenApiDocsTests` (10, Swagger ligado): título, versão e texto, esquema Bearer JWT, os dois grupos em `swagger-config`, as 4 rotas do grupo Alunos com cada operação, as respostas de erro e o `ErrorResponse`, parâmetros de paginação/ordenação/filtros, signin/refresh sem cadeado e register com cadeado, tela abre sem login, **ligar a documentação não abre a API** nem outros métodos (`POST /v3/api-docs` dá 401) **nem vaza o segredo do JWT** ou nomes de classes, exemplos úteis e sem senha. `ConfigHygieneTests` ganhou `oSwaggerNasceDesligadoPorPadrao`. `SecurityFilterChainTests.swaggerDesligadoPorPadraoNaoEPublico` e `SensitivePathsTests` agora incluem os caminhos do Swagger (negados desligado, até para o ADMIN). Sabotadas e pegas: padrão virando `true` (higiene), documentação sempre pública `permitAll` (4 testes), esquema `bearerAuth` removido (1 teste); restaurado.
+- **Provado na tela (Chrome, aplicação local com `SWAGGER_ENABLED=true`, banco descartável):** `/swagger-ui/index.html` abre; o seletor lista **Alunos** e **Autenticação**; o grupo Alunos mostra as 7 operações; o botão **Authorize** pede o token (`bearerAuth (http, Bearer)`) e passou a "Authorized"; **Try it out** + **Execute** em `GET /alunos` mandou `Authorization: Bearer ...` e voltou **200** com o corpo HAL. O banco `crud_alunos` ficou intacto (408 alunos, 0 usuários).
+- **Achado na tela e corrigido:** o `example = "ana"` do filtro `nome` era **enviado como valor** pelo "Try it out" (a lista vinha filtrada sem querer). Troquei por texto na descrição ("Ex.: ana"). Vale para o `id`, cujo exemplo `1` é desejável.
+- **Como testar localmente (passo a passo):**
+  1. `git checkout develop` e `git pull origin develop`.
+  2. `docker start mysql-dev` (MySQL local, porta 3307).
+  3. Abrir um **PowerShell novo, fora do VS Code** (veja a armadilha abaixo) e rodar, dentro de `apicrud-alunos`: `$env:SWAGGER_ENABLED = "true"`, `$env:ADMIN_BOOTSTRAP_PASSWORD = "<senha de 12+ caracteres>"` e `.\mvnw spring-boot:run`. O `DB_PASSWORD` e o `JWT_SECRET` já vêm das variáveis de usuário do Windows. O banco local está sem usuários, por isso a senha do bootstrap cria o `admin`.
+  4. Abrir `http://localhost:8080/swagger-ui/index.html`. No seletor, **Autenticação** → `POST /auth/signin` → *Try it out* com `admin` e a senha → copiar o `accessToken`. Trocar para **Alunos** → **Authorize** (sem a palavra `Bearer`) → `GET /alunos` → *Execute* = 200.
+  5. O token vale 15 minutos. `Ctrl+C` encerra a aplicação.
+- **Armadilha (2026-11-04):** rodar pelo botão Run do VS Code falhou com "A variável de ambiente DB_PASSWORD não foi definida". As variáveis existem no Windows (nível de usuário), mas o **VS Code foi aberto antes de elas existirem** e só lê o ambiente ao abrir. Solução: fechar o VS Code por completo e reabrir, ou usar um PowerShell novo. `SWAGGER_ENABLED` e `ADMIN_BOOTSTRAP_PASSWORD` não existem no Windows de propósito: só no terminal onde a aplicação sobe.
+- **Erros do caminho:** o `springdoc` não aceita o operador `*~` do JsonPath do teste (troquei por um *matcher* de chaves); meus cortes de texto quebraram um arquivo CRLF (`SecurityFilterChainTests`), restaurado do git e refeito por linhas; o `docker compose build` precisa rodar dentro de `apicrud-alunos`.
+- **Para ligar na AWS (opcional, não feito):** acrescentar `SWAGGER_ENABLED=true` em `environment` da Task Definition (não é segredo) e fazer uma release. Pesar o que a documentação pública revela (todas as rotas e regras) antes de ligar em produção.
+
 ## Próximos passos
-> **Atualização 2026-11-03:** o usuário criou o segredo `secrets_crud_alunos/jwt-secret` e liberou a leitura na `ecsTaskExecutionRole`; `JWT_SECRET` já está em `secrets` do `task-definition.json` (branch `feature/endurecimento`, ainda não implantado). O segredo da senha do primeiro admin também foi criado e `ADMIN_BOOTSTRAP_PASSWORD` entrou em `secrets` (confirmar que a política de leitura tem o ARN). Depois do 1º deploy, REMOVER essa variável do arquivo e fazer novo deploy.
 
-Atualizado no fim do dia 2026-11-02. A seção "COMO RETOMAR" do `memoria.md` tem a versão curta.
+Atualizado no fim do dia 2026-11-04. A seção "Como retomar" do `memoria.md` tem a versão curta.
 
-### 1. Mesclar a pilha de PRs da segurança (a ordem importa; cada merge só com o "pode" explícito do usuário)
-
-A `develop` já tem a segurança até a **autenticação** (PRs #27 e #29, 200 testes). Faltam três branches empilhadas, cada uma sobre a anterior:
-
-| Ordem | Branch | O que traz | Estado |
-| --- | --- | --- | --- |
-| 1 | `feature/autorizacao` (PR #30) | quem pode o quê, regra final `denyAll` | PR aberto, `build` verde |
-| 2 | `feature/cors` | CORS por origens configuradas, vazio por padrão | branch no GitHub |
-| 3 | `feature/endurecimento` | `V6`, primeiro admin por variável de ambiente, guardas de teste | branch no GitHub |
-
-Cada uma já contém as anteriores (foram juntadas com `merge`, sem reescrever história). Depois de mesclar a #30, abrir o PR da próxima; as anotações (`PassoAPasso.md` e `memoria.md`) podem dar conflito entre elas: manter as duas versões.
-
-### 2. NÃO fazer release da segurança antes disto (a tarefa na AWS não sobe sem o `JWT_SECRET`)
-
-O roteiro completo está no passo 39. Resumo: segredo do JWT e segredo da senha do primeiro admin no Secrets Manager; permissão de leitura na `ecsTaskExecutionRole`; `JWT_SECRET` (e, só no primeiro deploy, `ADMIN_BOOTSTRAP_PASSWORD`) em `secrets` no `task-definition.json`, **só depois de existirem os ARNs**; depois do primeiro start, tirar o bootstrap. Tudo isso é do console da AWS. O perfil `crud-alunos` da CLI não tem permissão de Secrets Manager nem de IAM.
-
-### 3. Continuar o playbook
-
-O usuário cola o próximo passo, um de cada vez (a numeração do playbook é diferente da nossa). O que vem depois do CORS e do endurecimento é o "Passo 38 do playbook" (testes de segurança que faltam). O 403 de rotas de dados, o 401 de tokens ruins e o login já têm teste.
-
-### 4. Pendências de antes
-
-- **Ambiente da AWS LIGADO** (RDS e Service) desde a release 1.2.0; ao terminar, *Desired tasks* = 0 e RDS *Stop temporarily*. O RDS parado religa sozinho após 7 dias (previsto por volta de **2026-11-09**).
-- Swagger e `v3/api-docs`: adiado até o Swagger existir (decisão do usuário).
-- Seções 12 a 14 do tutorial da AWS (rotina, problemas comuns, limpeza): ainda não executadas.
-- Sobras na AWS: `rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos` (sem o "i") e a política `LerSecretDB_CrudAlunos` que ficou numa role errada.
-- Branches remotas já mescladas que podem ser apagadas **quando o usuário pedir**: `feature/autenticacao`. A `teste-ci-quebrado` nunca foi mesclada, de propósito.
-- Limitações de segurança conhecidas: sem limite de tentativas de login nem bloqueio de conta; não há endpoint para trocar senha nem para dar `ADMIN` a outro usuário (só pelo banco).
+1. **Testar o Swagger localmente** (primeiro item de 2026-11-05, pedido do usuário): ver "Como testar localmente" na seção 44.
+2. **Continuar o playbook:** o usuário cola o **Passo 42** (a numeração do playbook é diferente da nossa: playbook 41 = nossa seção 44).
+3. **Decisão do usuário:** ligar ou não o Swagger na AWS (`SWAGGER_ENABLED=true` em `environment` da Task Definition + release). Hoje está desligado lá.
+4. **Ambiente da AWS LIGADO** (RDS e Service). Ao terminar: *Desired tasks* = 0 e RDS *Stop temporarily* (religa sozinho após 7 dias).
+5. **Opcional no console:** apagar o segredo `secrets_crud_alunos/admin-bootstrap-password` e tirar seu ARN da política `LerSecretDB_CrudAlunos` (não é mais usado).
+6. **Sobras na AWS:** `rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos` (sem o "i") e a política `LerSecretDB_CrudAlunos` que ficou numa role errada. Seções 12 a 14 do tutorial da AWS (rotina, problemas comuns, limpeza) ainda não executadas.
+7. **Branches remotas:** `teste-ci-quebrado` nunca foi mesclada, de propósito. As `feature/*` já mescladas só se apagam quando o usuário pedir.
+8. **Limitações de segurança conhecidas:** sem limite de tentativas de login nem bloqueio de conta; sem endpoint para trocar senha nem para dar `ADMIN` a outro usuário (só pelo banco).

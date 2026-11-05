@@ -115,9 +115,14 @@ class SecurityFilterChainTests {
 	}
 
 	@Test
-	void swaggerNaoEPublicoPorqueOProjetoNaoTem() throws Exception {
+	// o Swagger nasce DESLIGADO (SWAGGER_ENABLED=false): a documentação não fica exposta sem querer.
+	// Ligado, ele é testado em config/OpenApiDocsTests.
+	void swaggerDesligadoPorPadraoNaoEPublico() throws Exception {
 		mockMvc.perform(get("/swagger-ui/index.html")).andExpect(status().isUnauthorized());
+		mockMvc.perform(get("/swagger-ui.html")).andExpect(status().isUnauthorized());
 		mockMvc.perform(get("/v3/api-docs")).andExpect(status().isUnauthorized());
+		mockMvc.perform(get("/v3/api-docs/alunos")).andExpect(status().isUnauthorized());
+		mockMvc.perform(get("/v3/api-docs/swagger-config")).andExpect(status().isUnauthorized());
 	}
 
 	@Test

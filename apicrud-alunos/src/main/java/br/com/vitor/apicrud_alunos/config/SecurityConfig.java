@@ -1,5 +1,6 @@
 package br.com.vitor.apicrud_alunos.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -10,6 +11,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,7 +30,8 @@ public class SecurityConfig {
 
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtTokenProvider tokenProvider,
-			RestAuthenticationEntryPoint entryPoint, RestAccessDeniedHandler accessDeniedHandler) throws Exception {
+			RestAuthenticationEntryPoint entryPoint, RestAccessDeniedHandler accessDeniedHandler,
+			@Value("${springdoc.api-docs.enabled:false}") boolean documentacaoLigada) throws Exception {
 		return http
 				// API com token: não há cookie de sessão, então não há o que o CSRF proteger
 				.csrf(AbstractHttpConfigurer::disable)
@@ -48,6 +51,9 @@ public class SecurityConfig {
 				.authorizeHttpRequests(rotas -> rotas
 						.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 						.requestMatchers(HttpMethod.POST, "/auth/signin", "/auth/refresh").permitAll()
+						// documentação (Swagger): só é pública quando SWAGGER_ENABLED=true; desligado (o padrão) cai na regra final
+						.requestMatchers(HttpMethod.GET, "/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**")
+								.access((autenticacao, contexto) -> new AuthorizationDecision(documentacaoLigada))
 						// cadastro de usuários: só quem tem a permissão ADMIN (qualquer método; sem token dá 401, sem a permissão dá 403)
 						.requestMatchers("/auth/register").hasAuthority(Authorities.ADMIN)
 						// ---- autorização por rota: quem pode o quê (estar logado não basta) ----

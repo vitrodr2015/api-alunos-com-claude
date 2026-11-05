@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import br.com.vitor.apicrud_alunos.assembler.AlunoModelAssembler;
+import br.com.vitor.apicrud_alunos.controller.docs.AlunoControllerDocs;
 import br.com.vitor.apicrud_alunos.dto.AlunoRequest;
 import br.com.vitor.apicrud_alunos.dto.AlunoResponse;
 import br.com.vitor.apicrud_alunos.mapper.AlunoMapper;
@@ -33,7 +34,7 @@ import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/alunos")
-public class AlunoController {
+public class AlunoController implements AlunoControllerDocs {
 
 	private final AlunoService service;
 	private final AlunoMapper mapper;
@@ -49,6 +50,7 @@ public class AlunoController {
 	}
 
 	@PostMapping
+	@Override
 	public ResponseEntity<AlunoResponse> criar(@Valid @RequestBody AlunoRequest request) {
 		Aluno criado = service.criar(mapper.toEntity(request));
 		URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}")
@@ -58,6 +60,7 @@ public class AlunoController {
 
 	// A listagem e a busca por id respondem em HAL (JSON com _links); os demais endpoints continuam como antes
 	@GetMapping(produces = { HAL_JSON_VALUE, MediaType.APPLICATION_JSON_VALUE })
+	@Override
 	public PagedModel<EntityModel<AlunoResponse>> listar(
 			@RequestParam(required = false) String nome,
 			@RequestParam(required = false) Boolean ativo,
@@ -68,26 +71,31 @@ public class AlunoController {
 	}
 
 	@GetMapping(value = "/{id}", produces = { HAL_JSON_VALUE, MediaType.APPLICATION_JSON_VALUE })
+	@Override
 	public EntityModel<AlunoResponse> buscar(@PathVariable Long id) {
 		return assembler.toModel(mapper.toResponse(service.buscar(id)));
 	}
 
 	@PutMapping("/{id}")
+	@Override
 	public AlunoResponse atualizar(@PathVariable Long id, @Valid @RequestBody AlunoRequest request) {
 		return mapper.toResponse(service.atualizar(id, mapper.toEntity(request)));
 	}
 
 	@PatchMapping("/{id}/disable")
+	@Override
 	public AlunoResponse desativar(@PathVariable Long id) {
 		return mapper.toResponse(service.desativar(id));
 	}
 
 	@PatchMapping("/{id}/enable")
+	@Override
 	public AlunoResponse ativar(@PathVariable Long id) {
 		return mapper.toResponse(service.ativar(id));
 	}
 
 	@DeleteMapping("/{id}")
+	@Override
 	public ResponseEntity<Void> remover(@PathVariable Long id) {
 		service.remover(id);
 		return ResponseEntity.noContent().build();

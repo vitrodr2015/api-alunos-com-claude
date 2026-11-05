@@ -780,39 +780,25 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Testes novos/alterados:** `config/OpenApiDocsTests` (10, Swagger ligado): título, versão e texto, esquema Bearer JWT, os dois grupos em `swagger-config`, as 4 rotas do grupo Alunos com cada operação, as respostas de erro e o `ErrorResponse`, parâmetros de paginação/ordenação/filtros, signin/refresh sem cadeado e register com cadeado, tela abre sem login, **ligar a documentação não abre a API** nem outros métodos (`POST /v3/api-docs` dá 401) **nem vaza o segredo do JWT** ou nomes de classes, exemplos úteis e sem senha. `ConfigHygieneTests` ganhou `oSwaggerNasceDesligadoPorPadrao`. `SecurityFilterChainTests.swaggerDesligadoPorPadraoNaoEPublico` e `SensitivePathsTests` agora incluem os caminhos do Swagger (negados desligado, até para o ADMIN). Sabotadas e pegas: padrão virando `true` (higiene), documentação sempre pública `permitAll` (4 testes), esquema `bearerAuth` removido (1 teste); restaurado.
 - **Provado na tela (Chrome, aplicação local com `SWAGGER_ENABLED=true`, banco descartável):** `/swagger-ui/index.html` abre; o seletor lista **Alunos** e **Autenticação**; o grupo Alunos mostra as 7 operações; o botão **Authorize** pede o token (`bearerAuth (http, Bearer)`) e passou a "Authorized"; **Try it out** + **Execute** em `GET /alunos` mandou `Authorization: Bearer ...` e voltou **200** com o corpo HAL. O banco `crud_alunos` ficou intacto (408 alunos, 0 usuários).
 - **Achado na tela e corrigido:** o `example = "ana"` do filtro `nome` era **enviado como valor** pelo "Try it out" (a lista vinha filtrada sem querer). Troquei por texto na descrição ("Ex.: ana"). Vale para o `id`, cujo exemplo `1` é desejável.
+- **Como testar localmente (passo a passo):**
+  1. `git checkout develop` e `git pull origin develop`.
+  2. `docker start mysql-dev` (MySQL local, porta 3307).
+  3. Abrir um **PowerShell novo, fora do VS Code** (veja a armadilha abaixo) e rodar, dentro de `apicrud-alunos`: `$env:SWAGGER_ENABLED = "true"`, `$env:ADMIN_BOOTSTRAP_PASSWORD = "<senha de 12+ caracteres>"` e `.\mvnw spring-boot:run`. O `DB_PASSWORD` e o `JWT_SECRET` já vêm das variáveis de usuário do Windows. O banco local está sem usuários, por isso a senha do bootstrap cria o `admin`.
+  4. Abrir `http://localhost:8080/swagger-ui/index.html`. No seletor, **Autenticação** → `POST /auth/signin` → *Try it out* com `admin` e a senha → copiar o `accessToken`. Trocar para **Alunos** → **Authorize** (sem a palavra `Bearer`) → `GET /alunos` → *Execute* = 200.
+  5. O token vale 15 minutos. `Ctrl+C` encerra a aplicação.
+- **Armadilha (2026-11-04):** rodar pelo botão Run do VS Code falhou com "A variável de ambiente DB_PASSWORD não foi definida". As variáveis existem no Windows (nível de usuário), mas o **VS Code foi aberto antes de elas existirem** e só lê o ambiente ao abrir. Solução: fechar o VS Code por completo e reabrir, ou usar um PowerShell novo. `SWAGGER_ENABLED` e `ADMIN_BOOTSTRAP_PASSWORD` não existem no Windows de propósito: só no terminal onde a aplicação sobe.
 - **Erros do caminho:** o `springdoc` não aceita o operador `*~` do JsonPath do teste (troquei por um *matcher* de chaves); meus cortes de texto quebraram um arquivo CRLF (`SecurityFilterChainTests`), restaurado do git e refeito por linhas; o `docker compose build` precisa rodar dentro de `apicrud-alunos`.
 - **Para ligar na AWS (opcional, não feito):** acrescentar `SWAGGER_ENABLED=true` em `environment` da Task Definition (não é segredo) e fazer uma release. Pesar o que a documentação pública revela (todas as rotas e regras) antes de ligar em produção.
 
 ## Próximos passos
-> **Atualização 2026-11-03:** o usuário criou o segredo `secrets_crud_alunos/jwt-secret` e liberou a leitura na `ecsTaskExecutionRole`; `JWT_SECRET` já está em `secrets` do `task-definition.json` (branch `feature/endurecimento`, ainda não implantado). O segredo da senha do primeiro admin também foi criado e `ADMIN_BOOTSTRAP_PASSWORD` entrou em `secrets` (confirmar que a política de leitura tem o ARN). Depois do 1º deploy, REMOVER essa variável do arquivo e fazer novo deploy.
 
-Atualizado no fim do dia 2026-11-02. A seção "COMO RETOMAR" do `memoria.md` tem a versão curta.
+Atualizado no fim do dia 2026-11-04. A seção "Como retomar" do `memoria.md` tem a versão curta.
 
-### 1. Mesclar a pilha de PRs da segurança (a ordem importa; cada merge só com o "pode" explícito do usuário)
-
-A `develop` já tem a segurança até a **autenticação** (PRs #27 e #29, 200 testes). Faltam três branches empilhadas, cada uma sobre a anterior:
-
-| Ordem | Branch | O que traz | Estado |
-| --- | --- | --- | --- |
-| 1 | `feature/autorizacao` (PR #30) | quem pode o quê, regra final `denyAll` | PR aberto, `build` verde |
-| 2 | `feature/cors` | CORS por origens configuradas, vazio por padrão | branch no GitHub |
-| 3 | `feature/endurecimento` | `V6`, primeiro admin por variável de ambiente, guardas de teste | branch no GitHub |
-
-Cada uma já contém as anteriores (foram juntadas com `merge`, sem reescrever história). Depois de mesclar a #30, abrir o PR da próxima; as anotações (`PassoAPasso.md` e `memoria.md`) podem dar conflito entre elas: manter as duas versões.
-
-### 2. NÃO fazer release da segurança antes disto (a tarefa na AWS não sobe sem o `JWT_SECRET`)
-
-O roteiro completo está no passo 39. Resumo: segredo do JWT e segredo da senha do primeiro admin no Secrets Manager; permissão de leitura na `ecsTaskExecutionRole`; `JWT_SECRET` (e, só no primeiro deploy, `ADMIN_BOOTSTRAP_PASSWORD`) em `secrets` no `task-definition.json`, **só depois de existirem os ARNs**; depois do primeiro start, tirar o bootstrap. Tudo isso é do console da AWS. O perfil `crud-alunos` da CLI não tem permissão de Secrets Manager nem de IAM.
-
-### 3. Continuar o playbook
-
-O usuário cola o próximo passo, um de cada vez (a numeração do playbook é diferente da nossa). O que vem depois do CORS e do endurecimento é o "Passo 38 do playbook" (testes de segurança que faltam). O 403 de rotas de dados, o 401 de tokens ruins e o login já têm teste.
-
-### 4. Pendências de antes
-
-- **Ambiente da AWS LIGADO** (RDS e Service) desde a release 1.2.0; ao terminar, *Desired tasks* = 0 e RDS *Stop temporarily*. O RDS parado religa sozinho após 7 dias (previsto por volta de **2026-11-09**).
-- Swagger e `v3/api-docs`: feito no passo 44 (nasce desligado; ligar na AWS é decisão do usuário).
-- Seções 12 a 14 do tutorial da AWS (rotina, problemas comuns, limpeza): ainda não executadas.
-- Sobras na AWS: `rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos` (sem o "i") e a política `LerSecretDB_CrudAlunos` que ficou numa role errada.
-- Branches remotas já mescladas que podem ser apagadas **quando o usuário pedir**: `feature/autenticacao`. A `teste-ci-quebrado` nunca foi mesclada, de propósito.
-- Limitações de segurança conhecidas: sem limite de tentativas de login nem bloqueio de conta; não há endpoint para trocar senha nem para dar `ADMIN` a outro usuário (só pelo banco).
+1. **Testar o Swagger localmente** (primeiro item de 2026-11-05, pedido do usuário): ver "Como testar localmente" na seção 44.
+2. **Continuar o playbook:** o usuário cola o **Passo 42** (a numeração do playbook é diferente da nossa: playbook 41 = nossa seção 44).
+3. **Decisão do usuário:** ligar ou não o Swagger na AWS (`SWAGGER_ENABLED=true` em `environment` da Task Definition + release). Hoje está desligado lá.
+4. **Ambiente da AWS LIGADO** (RDS e Service). Ao terminar: *Desired tasks* = 0 e RDS *Stop temporarily* (religa sozinho após 7 dias).
+5. **Opcional no console:** apagar o segredo `secrets_crud_alunos/admin-bootstrap-password` e tirar seu ARN da política `LerSecretDB_CrudAlunos` (não é mais usado).
+6. **Sobras na AWS:** `rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos` (sem o "i") e a política `LerSecretDB_CrudAlunos` que ficou numa role errada. Seções 12 a 14 do tutorial da AWS (rotina, problemas comuns, limpeza) ainda não executadas.
+7. **Branches remotas:** `teste-ci-quebrado` nunca foi mesclada, de propósito. As `feature/*` já mescladas só se apagam quando o usuário pedir.
+8. **Limitações de segurança conhecidas:** sem limite de tentativas de login nem bloqueio de conta; sem endpoint para trocar senha nem para dar `ADMIN` a outro usuário (só pelo banco).

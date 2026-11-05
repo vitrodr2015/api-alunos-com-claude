@@ -58,6 +58,7 @@
 | Segurança 2/2: segredo da senha do primeiro admin (`secrets_crud_alunos/admin-bootstrap-password`; `ADMIN_BOOTSTRAP_PASSWORD` em `secrets` do `task-definition.json`, só no 1º deploy) | ✅ Segredo criado pelo usuário em 2026-11-03; `task-definition.json` atualizado, **não implantado**. A política `LerSecretDB_CrudAlunos` precisa conter este ARN (a confirmar com o usuário). Depois do 1º deploy, remover a variável do arquivo |
 | Release 1.3.0 (segurança) | ✅ Deploy em 2026-11-03: task definition `:8`, rollout COMPLETED. Pendente: confirmar o login e remover `ADMIN_BOOTSTRAP_PASSWORD` da Task Definition |
 | Release 1.3.1 | ✅ 2026-11-04: `ADMIN_BOOTSTRAP_PASSWORD` tirado da Task Definition; task definition `:9`, rollout COMPLETED. Opcional pendente: apagar o segredo `admin-bootstrap-password` e seu ARN na política |
+| Swagger na AWS | ⏳ **Não ligado** (decisão do usuário). A aplicação traz o Swagger desligado por padrão; para ligar, `SWAGGER_ENABLED=true` em `environment` da Task Definition + release. Nada foi alterado na AWS |
 
 ---
 

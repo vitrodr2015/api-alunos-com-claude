@@ -33,3 +33,16 @@ security:
 # Origens de CORS só para os testes (duas, para provar a lista e o espaço depois da vírgula)
 cors:
   allowed-origins: https://app.exemplo.com, http://localhost:3000
+
+# Mesma configuracao de Actuator do application.yml principal (o de teste o substitui); o ConfigHygieneTests confere o principal
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+      show-components: never

@@ -51,6 +51,8 @@ public class SecurityConfig {
 				.authorizeHttpRequests(rotas -> rotas
 						.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 						.requestMatchers(HttpMethod.POST, "/auth/signin", "/auth/refresh").permitAll()
+						// health check: público e SÓ de leitura (devolve apenas {"status":"UP"}); o resto do /actuator continua negado
+						.requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
 						// documentação (Swagger): só é pública quando SWAGGER_ENABLED=true; desligado (o padrão) cai na regra final
 						.requestMatchers(HttpMethod.GET, "/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**")
 								.access((autenticacao, contexto) -> new AuthorizationDecision(documentacaoLigada))

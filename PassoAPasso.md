@@ -790,6 +790,14 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Erros do caminho:** o `springdoc` não aceita o operador `*~` do JsonPath do teste (troquei por um *matcher* de chaves); meus cortes de texto quebraram um arquivo CRLF (`SecurityFilterChainTests`), restaurado do git e refeito por linhas; o `docker compose build` precisa rodar dentro de `apicrud-alunos`.
 - **Para ligar na AWS (opcional, não feito):** acrescentar `SWAGGER_ENABLED=true` em `environment` da Task Definition (não é segredo) e fazer uma release. Pesar o que a documentação pública revela (todas as rotas e regras) antes de ligar em produção.
 
+## 45. Release 1.4.0: Swagger (desligado), integração com MySQL real e Postman (2026-11-04)
+
+- **O que entrou:** PRs #40 (coleções do Postman), #41 (pirâmide de testes: integração com MySQL 8.4 real, Testcontainers e REST Assured), #42 (Swagger/OpenAPI, desligado por padrão) e #43 (anotações). `release/1.4.0` → PR #44 para a `main` (merge `1d74478`), tag `v1.4.0`, back-merge no PR #45. **Sem migrations novas e sem mudança de variáveis na Task Definition.**
+- **Deploy:** esteira verde (285 testes, incluindo os 14 com Docker no runner), Service na task definition **`:10`**, rollout `COMPLETED` com 1 tarefa.
+- **Verificado na AWS sem a senha do admin** (IP `54.92.174.145`, muda a cada tarefa): `GET /alunos` sem token → 401; `/swagger-ui/index.html` → **401** e `/v3/api-docs` → **401** (o Swagger está **desligado** na AWS, como previsto); `POST /auth/signin` com a senha antiga → 401. O login do admin e as chamadas autenticadas ficam para o usuário testar no Postman.
+- **No fim do dia:** o usuário perguntou se podia desligar a tarefa e o RDS e foi orientado que sim (a release já estava conferida). **Conferido pela CLI: Service em 0 tarefas (desligado).** O RDS não dá para ver pela CLI: confirmação pendente. Se o RDS for parado em 2026-11-04, ele religa sozinho por volta de **2026-11-11**.
+- **Para amanhã:** testar o Swagger localmente (passo 44, "Como testar localmente") e colar o Passo 42 do playbook.
+
 ## Próximos passos
 
 Atualizado no fim do dia 2026-11-04. A seção "Como retomar" do `memoria.md` tem a versão curta.

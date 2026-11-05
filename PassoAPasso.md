@@ -790,12 +790,44 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Erros do caminho:** o `springdoc` não aceita o operador `*~` do JsonPath do teste (troquei por um *matcher* de chaves); meus cortes de texto quebraram um arquivo CRLF (`SecurityFilterChainTests`), restaurado do git e refeito por linhas; o `docker compose build` precisa rodar dentro de `apicrud-alunos`.
 - **Para ligar na AWS (opcional, não feito):** acrescentar `SWAGGER_ENABLED=true` em `environment` da Task Definition (não é segredo) e fazer uma release. Pesar o que a documentação pública revela (todas as rotas e regras) antes de ligar em produção.
 
+## 45. Release 1.4.0: Swagger (desligado), integração com MySQL real e Postman (2026-11-04)
+
+- **O que entrou:** PRs #40 (coleções do Postman), #41 (pirâmide de testes: integração com MySQL 8.4 real, Testcontainers e REST Assured), #42 (Swagger/OpenAPI, desligado por padrão) e #43 (anotações). `release/1.4.0` → PR #44 para a `main` (merge `1d74478`), tag `v1.4.0`, back-merge no PR #45. **Sem migrations novas e sem mudança de variáveis na Task Definition.**
+- **Deploy:** esteira verde (285 testes, incluindo os 14 com Docker no runner), Service na task definition **`:10`**, rollout `COMPLETED` com 1 tarefa.
+- **Verificado na AWS sem a senha do admin** (IP `54.92.174.145`, muda a cada tarefa): `GET /alunos` sem token → 401; `/swagger-ui/index.html` → **401** e `/v3/api-docs` → **401** (o Swagger está **desligado** na AWS, como previsto); `POST /auth/signin` com a senha antiga → 401. O login do admin e as chamadas autenticadas ficam para o usuário testar no Postman.
+- **No fim do dia:** o usuário perguntou se podia desligar a tarefa e o RDS e foi orientado que sim (a release já estava conferida). **Conferido pela CLI: Service em 0 tarefas (desligado).** O RDS não dá para ver pela CLI: confirmação pendente. Se o RDS for parado em 2026-11-04, ele religa sozinho por volta de **2026-11-11**.
+- **Para amanhã:** testar o Swagger localmente (passo 44, "Como testar localmente") e colar o Passo 42 do playbook.
+
+## 46. Health check (Actuator) (passo 42 do playbook)
+
+- **Status:** concluído na branch `feature/actuator`. 294 testes (eram 285). Feito numa cópia separada do repositório (`git worktree`), porque a aplicação do usuário estava rodando na porta 8080 com o DevTools.
+- **Dependência:** `spring-boot-starter-actuator` (versão do BOM do Spring Boot).
+- **Configuração (`application.yml`):** `management.endpoints.web.exposure.include: health` (**só o health é exposto na web**: `env`, `beans`, `heapdump`, `mappings`, `metrics`, `loggers`, `threaddump`, `info`... não existem), `management.endpoint.health.probes.enabled: true` (fora do Kubernetes é preciso ligar), `show-details: never` e `show-components: never`.
+- **Segurança:** `GET /actuator/health` e `GET /actuator/health/**` são **públicos** (`permitAll`), **só de leitura** (`POST`/`PUT`/`DELETE` dão 401). O resto do `/actuator` continua na regra final (`denyAll`): 401 para anônimo e 403 até para o ADMIN.
+- **O que cada endereço devolve** (conferido de verdade):
+  - `GET /actuator/health` → **200** `{"status":"UP","groups":["liveness","readiness"]}`. O playbook diz "só `{"status":"UP"}`"; com os probes ligados vem também o **nome** dos grupos, que não é dado sensível e o Spring não deixa esconder. Sem componentes, sem detalhes, sem URL do banco.
+  - `GET /actuator/health/liveness` e `/readiness` → **200** `{"status":"UP"}` (exatamente isso).
+  - **Este health completo inclui o banco.**
+- **Banco fora do ar (provado com um MySQL descartável que eu derrubei de verdade):** o `/actuator/health` completo devolve **503 `DOWN`**, mas só depois de **30 s** (o tempo de espera do pool de conexões); o `/actuator/health/liveness` responde **200 `UP` em 5 ms** no mesmo momento. Ao religar o banco, o health volta a `UP` sozinho. Conclusão prática: **ECS, ALB e qualquer orquestrador devem apontar para `/actuator/health/liveness`**; apontar para o health completo derrubaria a tarefa em laço sempre que o RDS estivesse parado, e ainda estouraria o tempo do check (o do ECS é de poucos segundos).
+- **A imagem não tem `curl` nem `wget`** (`eclipse-temurin:25-jre`, conferido com `command -v`). Por isso **não** coloquei `healthCheck` dentro do contêiner na Task Definition (a tarefa cairia). O Service hoje não usa ALB. Quando houver ALB, o *target group* checa por HTTP e **não precisa de `curl`**: apontar para `/actuator/health/liveness`. Se um dia for preciso um `healthCheck` dentro do contêiner, será preciso instalar `curl` na imagem ou usar outra verificação.
+- **Testes:**
+  - `config/HealthEndpointTests` (5, filtros ligados, sem token): health público com `UP` e sem `components`/`details`; liveness e readiness com o corpo exato; token inválido não atrapalha; só o `GET` é público; a raiz `/actuator`, `info`, `env`, `beans` e `/actuator/health/../env` (o firewall rejeita o `..` com 400) não abrem.
+  - `config/HealthDownTests` (2): um componente falso simula o banco fora do ar: health completo **503 `DOWN` sem vazar** a URL nem o texto do erro; liveness e readiness continuam `UP`.
+  - `config/ConfigHygieneTests` (+1): o `application.yml` **principal** expõe só o `health`, com probes e sem detalhes (o yml de teste repete a configuração porque substitui o principal).
+  - `security/SensitivePathsTests`: o `/actuator/health` saiu da lista de negados (agora é público) e entraram `info`, `metrics`, `loggers`, `threaddump`, `configprops`, `conditions`, `prometheus`, `flyway` e `shutdown` (401 anônimo e 403 até para o ADMIN).
+  - `integration/FluxoCompletoIntegrationTests` (+1): com o **MySQL real**, o health completo (que inclui o banco), o liveness e o readiness dão `UP`; `/actuator/env` dá 403 até para o ADMIN.
+- **Sabotagens (todas pegas, código restaurado):** incluir `env,beans` na exposição → 1 falha (higiene); liberar `/actuator/**` inteiro no `SecurityConfig` → 3 falhas (aqui a exposição estava certa e só a regra de segurança segurava; ela é a segunda trava); desligar os probes → 1 falha; `show-details: always` → 1 falha. Observação: tirar `env` da exposição **e** da regra de segurança são travas independentes; o teste de higiene cobre a primeira e o de caminhos sensíveis cobre a segunda.
+- **Prova real:** aplicação na porta 8081 com um MySQL descartável na 3308 (a do usuário e o `mysql-dev` não foram tocados): `UP`, liveness e readiness `UP`, 9 outros endereços do Actuator (`/actuator`, `env`, `beans`, `heapdump`, `mappings`, `info`, `metrics`, `loggers`, `threaddump`) dão **401**; banco derrubado → 503 `DOWN` em 30 s e liveness `UP` em 5 ms; banco religado → `UP`; o corpo do health não tem `jdbc`, usuário nem senha. Contêiner descartável removido e a 8081 liberada.
+- **Nada mudou na AWS:** `task-definition.json` e variáveis ficaram iguais. O health só vai para lá numa próxima release.
+- **Erros do caminho:** a aplicação do usuário (porta 8080) foi encerrada por ele durante o trabalho (os PIDs deixaram de existir; nenhum comando meu a tocou: o script que encerra processos só atua na 8081); o meu `node -e` com caminho do Windows e os `\n` dentro de texto passado pelo shell falharam de novo (regra: criar o trecho com o editor de arquivos e lê-lo por um script, e usar caminhos do Windows via variável de ambiente); o teste de integração do passo 43 listava `/actuator/health` como negado e quebrou (corrigido).
+- **Pronto quando (do playbook):** `GET /actuator/health` devolve `UP` sem token (feito) e nenhum outro endpoint do Actuator está exposto (feito: exposição só `health` e o resto negado).
+
 ## Próximos passos
 
 Atualizado no fim do dia 2026-11-04. A seção "Como retomar" do `memoria.md` tem a versão curta.
 
 1. **Testar o Swagger localmente** (primeiro item de 2026-11-05, pedido do usuário): ver "Como testar localmente" na seção 44.
-2. **Continuar o playbook:** o usuário cola o **Passo 42** (a numeração do playbook é diferente da nossa: playbook 41 = nossa seção 44).
+2. **Continuar o playbook:** o usuário cola o **Passo 43** (a numeração do playbook é diferente da nossa: playbook 42 = nossa seção 46).
 3. **Decisão do usuário:** ligar ou não o Swagger na AWS (`SWAGGER_ENABLED=true` em `environment` da Task Definition + release). Hoje está desligado lá.
 4. **Ambiente da AWS LIGADO** (RDS e Service). Ao terminar: *Desired tasks* = 0 e RDS *Stop temporarily* (religa sozinho após 7 dias).
 5. **Opcional no console:** apagar o segredo `secrets_crud_alunos/admin-bootstrap-password` e tirar seu ARN da política `LerSecretDB_CrudAlunos` (não é mais usado).

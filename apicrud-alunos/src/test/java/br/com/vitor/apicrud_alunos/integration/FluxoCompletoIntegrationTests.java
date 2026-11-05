@@ -287,10 +287,20 @@ class FluxoCompletoIntegrationTests extends AbstractIntegrationTest {
 	@Test
 	void rotasSemRegraECaminhosSensiveisSaoNegadosAteParaOAdministrador() {
 		String admin = tokenDoAdmin();
-		for (String caminho : List.of("/actuator/env", "/actuator/health", "/h2-console", "/.env", "/rota-que-nao-existe")) {
+		for (String caminho : List.of("/actuator/env", "/actuator/beans", "/actuator/heapdump", "/h2-console", "/.env", "/rota-que-nao-existe")) {
 			given().auth().oauth2(admin).get(caminho).then().statusCode(403);
 			given().get(caminho).then().statusCode(401);
 		}
+	}
+
+	// health check com o MySQL REAL: o /actuator/health completo inclui o banco; público, só o status, sem detalhes
+	@Test
+	void healthEPublicoEUPComOMySqlReal() {
+		given().get("/actuator/health").then().statusCode(200).body("status", equalTo("UP")).body("components", org.hamcrest.Matchers.nullValue());
+		given().get("/actuator/health/liveness").then().statusCode(200).body("status", equalTo("UP"));
+		given().get("/actuator/health/readiness").then().statusCode(200).body("status", equalTo("UP"));
+		// só o health: o resto do Actuator continua fechado, até com token de ADMIN
+		given().auth().oauth2(tokenDoAdmin()).get("/actuator/env").then().statusCode(403);
 	}
 
 	@Test

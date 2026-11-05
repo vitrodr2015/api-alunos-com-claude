@@ -31,11 +31,14 @@ import br.com.vitor.apicrud_alunos.repository.PermissionRepository;
 @Transactional
 class SensitivePathsTests {
 
-	// caminhos clássicos de exposição acidental: console de banco, actuator, arquivos de ambiente.
+	// caminhos clássicos de exposição acidental: console de banco, actuator, arquivos de ambiente. O /actuator/health (e
+	// seus /liveness e /readiness) é público de propósito e tem os testes próprios em HealthEndpointTests.
 	// O Swagger e o v3/api-docs ficam de FORA de propósito: o projeto ainda não tem Swagger (decisão do responsável:
 	// só se valida quando ele existir).
 	private static final List<String> CAMINHOS_SENSIVEIS = List.of(
-			"/actuator", "/actuator/health", "/actuator/env", "/actuator/beans", "/actuator/heapdump", "/actuator/mappings",
+			"/actuator", "/actuator/info", "/actuator/env", "/actuator/beans", "/actuator/heapdump", "/actuator/mappings",
+			"/actuator/metrics", "/actuator/loggers", "/actuator/threaddump", "/actuator/configprops", "/actuator/conditions",
+			"/actuator/prometheus", "/actuator/flyway", "/actuator/shutdown",
 			"/h2-console", "/h2-console/", "/console",
 			"/.env", "/.git/config", "/application.yml", "/application.properties", "/WEB-INF/web.xml", "/server-status",
 			"/error",

@@ -57,3 +57,20 @@ springdoc:
     persist-authorization: true
     operations-sorter: method
     tags-sorter: alpha
+
+# Health check (Actuator). Expoe SOMENTE o health: env, beans, heapdump, mappings, metrics etc. nao existem na web.
+# GET /actuator/health devolve so {"status":"UP"} (sem detalhes). Com probes.enabled ha tambem:
+#   /actuator/health/liveness  = "o processo esta vivo" (NAO depende do banco; use este em orquestrador/ALB)
+#   /actuator/health/readiness = "pronta para receber trafego"
+# O /actuator/health completo inclui o banco: com o RDS parado ele responde 503 DOWN.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+      show-components: never

@@ -44,3 +44,16 @@ app:
     # existir nenhum ADMIN. Na AWS a senha vem do Secrets Manager, nunca escrita em arquivo.
     username: ${ADMIN_BOOTSTRAP_USERNAME:admin}
     password: ${ADMIN_BOOTSTRAP_PASSWORD:}
+
+# Swagger / OpenAPI. DESLIGADO por padrao (a documentacao nao fica exposta sem querer, principalmente em producao).
+# Para ver a tela: SWAGGER_ENABLED=true e abrir /swagger-ui/index.html. Ligado, as rotas da documentacao sao publicas
+# (a tela precisa carregar antes do login); chamar a API continua exigindo o token (botao Authorize).
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}
+    # guarda o token ao recarregar a pagina
+    persist-authorization: true
+    operations-sorter: method
+    tags-sorter: alpha

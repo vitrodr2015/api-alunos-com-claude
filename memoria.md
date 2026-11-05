@@ -87,6 +87,7 @@ Arquivo para retomar o contexto se a conversa for perdida. Ler junto com `PassoA
 - **Release 1.3.1 FEITA em 2026-11-04 (tag `v1.3.1`, task definition `:9`):** `ADMIN_BOOTSTRAP_PASSWORD` removido do `task-definition.json`; o admin continua logando. Configuração do token no Postman: item do usuário. AWS LIGADA (RDS e Service) desde 2026-11-04.
 - **Postman (2026-11-04, branch `feature/postman-seguranca`):** coleção com login automático (Bearer `{{token}}`), pasta de autenticação e pasta de segurança (401/403); ambientes local e AWS; `adminPassword` fica vazio no arquivo (preencher no Postman). Validada com newman (105 asserções).
 - **Passos 38 e 39 do playbook (nosso 43) feitos juntos (o 39 pede Testcontainers: classe base com contêiner único + perfil `testcontainers`), branch `feature/piramide-testes` (PR a abrir/mesclar com o "pode"):** nível de integração com MySQL 8.4 real (Testcontainers) + REST Assured, `integration/FluxoCompletoIntegrationTests` (14 testes), migrations V1–V6 reais, tokens reais; matriz da pirâmide no PassoAPasso (403 não se aplica ao service); novo teste de 409 na camada de segurança. 274 testes. **Exige Docker ligado (local e CI).**
+- **Passo 41 do playbook (nosso 44) feito, branch `feature/swagger`:** springdoc 3.2.0; Swagger DESLIGADO por padrão (`SWAGGER_ENABLED`); interfaces `controller/docs` (`AlunoControllerDocs`, `AuthControllerDocs`), `OpenApiConfig` (bearerAuth, 2 grupos); testado na tela (Authorize + Execute = 200). 285 testes. Regra para rota nova: documentar na interface `*Docs` (e a regra no `SecurityConfig` e na matriz do `AuthorizationTests`).
 
 - Decidir o destino do `HELP.md`.
 - Escolher MapStruct ou Dozer, se o usuário quiser trocar o mapper manual.
@@ -97,7 +98,7 @@ Arquivo para retomar o contexto se a conversa for perdida. Ler junto com `PassoA
 - Branches remotas: `teste-ci-quebrado` nunca foi mesclada, de propósito; `feature/autenticacao` já foi mesclada (PR #29) e só se apaga se o usuário pedir. A `release/1.2.0` já não existe mais.
 - Pilha de PRs da segurança: TODA mesclada (#29 a #32) e na `main` pela release 1.3.0.
 - **Release 1.3.0 FEITA em 2026-11-03 (tag `v1.3.0`, task definition `:8`).** Falta: o usuário confirmar o login `admin` na AWS e depois REMOVER `ADMIN_BOOTSTRAP_PASSWORD` do `task-definition.json` + novo deploy (detalhes no passo 40 do `PassoAPasso.md`).
-- Swagger/`v3/api-docs`: adiado até existir (decisão do usuário). Sem limite de tentativas de login (limitação conhecida).
+- Swagger/OpenAPI feito (passo 44 do PassoAPasso): nasce DESLIGADO (`SWAGGER_ENABLED`, padrão false; ligado só local). Para ligar na AWS: `SWAGGER_ENABLED=true` em `environment` da Task Definition + release (decisão do usuário). Sem limite de tentativas de login (limitação conhecida).
 
 
 ## Estado
@@ -110,4 +111,4 @@ Arquivo para retomar o contexto se a conversa for perdida. Ler junto com `PassoA
 - **Proteção das branches:** rulesets `protect-main`, `protect-develop` e `protect-release` (`release/**`), todos ativos: PR obrigatório (0 aprovações), check `build` verde e atualizado, sem force push; `main` e `develop` também não podem ser apagadas. `gh` 2.103.3 instalado e logado como `vitrodr2015`. No PowerShell 5.1, passar JSON para `gh api` por arquivo (`--input arquivo.json`, sem BOM) e evitar `--jq` com aspas. O classificador de segurança bloqueou um `git push origin --delete` quando eu o usei sem pedido; depois que o usuário pediu explicitamente, `gh api -X DELETE repos/.../git/refs/heads/<nome>` funcionou. Só apagar branch remota com pedido explícito e depois de conferir que está mesclada. Teste de bloqueio confirmado (o PR da `teste-ci-quebrado` ficou bloqueado e foi fechado sem mesclar). O repositório é público, então a regra vale.
 - O bloco `permissions: contents: read` já está no workflow (PR #2, mesclado).
 - `PassoAPasso.md` (passos 13 a 39), `Duvida-CICD.md` (seções 11 e 15) e este arquivo foram atualizados até o fim de 2026-11-02 (passo 39, endurecimento). Push que muda só `.md` não dispara a esteira. Dúvidas conceituais que o usuário tira na conversa (ex.: como o database e as tabelas nascem no RDS) **não** entram nos arquivos, a pedido dele.
-- `./mvnw -B verify`: 274 testes passando na ponta da pilha (`feature/piramide-testes`; inclui 14 de integração com Docker).
+- `./mvnw -B verify`: 285 testes passando na ponta (`feature/swagger`; 14 de integração com Docker).

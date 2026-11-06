@@ -881,6 +881,13 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
   4. O perfil da CLI (`crud-alunos`) lê ECS, ECR e EC2, mas **não** lê CloudWatch Logs nem RDS: para o log da tarefa, usar o console.
 - **Estado final:** `main` na `1.4.1` (tag `v1.4.1`), `develop` sincronizada (PR #51), AWS na task definition `:12`, 326 testes.
 
+## 50. Colinha para novas APIs (2026-11-05)
+
+- **Pedido do usuário:** um documento mais **macro** que o `Playbook.md`, como uma colinha para consultar as etapas de criar uma API nova.
+- **Arquivo:** `Colinha-Nova-API.md` (raiz). Lista de 21 etapas (0 a 20) na **ordem recomendada para a próxima API**, cada uma com "feito quando" e o apontamento para a fase do `Playbook.md`; cinco perguntas antes de começar; tabela de o que dá para pular conforme o tamanho (protótipo, API interna, produção real); as 10 regras de ouro; e o que levar de um projeto para o outro.
+- **A ordem não é a cronológica deste projeto.** As etapas marcadas com ★ foram feitas tarde aqui e valem ser feitas cedo: CI e proteção de branches logo no início, testes com MySQL real (Testcontainers) já com o banco, guardas de configuração na esteira, Swagger e Postman junto da API, e `health` com o tratamento de banco fora do ar (503) antes de ir para a nuvem.
+- **Ideia ainda não feita:** guardar no repositório os scripts de QA (bateria HTTP e fase de banco/logs) para repetir antes de cada release.
+
 ## Próximos passos
 
 Atualizado em 2026-11-05 (noite). A seção "Como retomar" do `memoria.md` tem a versão curta, e o `Playbook.md` é a versão limpa de tudo o que foi feito.

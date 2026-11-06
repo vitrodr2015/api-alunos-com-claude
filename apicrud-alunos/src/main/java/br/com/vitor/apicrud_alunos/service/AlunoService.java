@@ -1,5 +1,7 @@
 package br.com.vitor.apicrud_alunos.service;
 
+import java.util.Set;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -87,7 +89,10 @@ public class AlunoService {
 
 	@Transactional
 	public void remover(Long id) {
-		repository.delete(buscar(id));
+		validarId(id);
+		if (repository.apagarPorId(id) == 0) {
+			throw new ResourceNotFoundException("Aluno não encontrado com id=" + id);
+		}
 		log.info("DELETE /alunos/{} - aluno removido", id);
 	}
 
@@ -108,7 +113,16 @@ public class AlunoService {
 	}
 
 	// o id desempata a ordenação (e é a ordem padrão), para a paginação ser estável entre as páginas
+	// campos pelos quais a listagem pode ser ordenada (os do aluno); qualquer outra coisa é 400
+	private static final Set<String> CAMPOS_ORDENAVEIS = Set.of("id", "nome", "email", "dataNascimento", "ativo");
+
 	private Pageable comDesempatePeloId(Pageable pageable) {
+		for (Sort.Order ordem : pageable.getSort()) {
+			if (!CAMPOS_ORDENAVEIS.contains(ordem.getProperty())) {
+				throw new InvalidRequestException(
+						"Não é possível ordenar por esse campo. Campos aceitos: id, nome, email, dataNascimento, ativo");
+			}
+		}
 		Sort sort = pageable.getSort();
 		if (sort.isUnsorted()) {
 			sort = Sort.by("id");

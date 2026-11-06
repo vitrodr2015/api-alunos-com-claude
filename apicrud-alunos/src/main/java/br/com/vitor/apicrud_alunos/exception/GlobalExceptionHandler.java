@@ -3,6 +3,7 @@ package br.com.vitor.apicrud_alunos.exception;
 import java.time.Instant;
 import java.util.stream.Collectors;
 
+import org.apache.tomcat.util.http.InvalidParameterException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
@@ -76,8 +77,24 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		return build(HttpStatus.CONFLICT, ex.getMessage());
 	}
 
+	// o banco está fora do ar (sem conexão, sem transação, tempo esgotado): 503 e "tente de novo", e não 500 nem 401
+	@ExceptionHandler(ServicoIndisponivelException.class)
+	public ResponseEntity<ErrorResponse> handleServicoIndisponivel(ServicoIndisponivelException ex) {
+		log.error("Banco indisponível: {}", ex.getCause() == null ? ex.getMessage() : ex.getCause().getClass().getSimpleName());
+		return indisponivel(ex.getMessage());
+	}
+
+	// parâmetro da URL com percentual inválido (?nome=%ZZ): o Tomcat não consegue decodificar; é erro do cliente (400)
+	@ExceptionHandler(InvalidParameterException.class)
+	public ResponseEntity<ErrorResponse> handleParametroMalCodificado(InvalidParameterException ex) {
+		return build(HttpStatus.BAD_REQUEST, "Parâmetro da URL com codificação inválida");
+	}
+
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<ErrorResponse> handleUnexpected(Exception ex) {
+		if (FalhaDeInfraestrutura.bancoIndisponivel(ex)) {
+			return handleServicoIndisponivel(new ServicoIndisponivelException(ex));
+		}
 		log.error("Erro inesperado", ex);
 		return build(HttpStatus.INTERNAL_SERVER_ERROR, "Erro interno do servidor");
 	}
@@ -116,6 +133,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 				.body(toResponse(status, message));
 	}
 
+	private ResponseEntity<ErrorResponse> indisponivel(String message) {
+		return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).header(HttpHeaders.RETRY_AFTER, "5")
+				.contentType(MediaType.APPLICATION_JSON).body(toResponse(HttpStatus.SERVICE_UNAVAILABLE, message));
+	}
+
 	private ResponseEntity<ErrorResponse> build(HttpStatus status, String message) {
 		return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(toResponse(status, message));
 	}
@@ -134,6 +156,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 			case CONFLICT -> "Conflito";
 			case UNSUPPORTED_MEDIA_TYPE -> "Tipo de conteúdo não suportado";
 			case INTERNAL_SERVER_ERROR -> "Erro interno";
+			case SERVICE_UNAVAILABLE -> "Serviço indisponível";
 			default -> status.getReasonPhrase();
 		};
 	}

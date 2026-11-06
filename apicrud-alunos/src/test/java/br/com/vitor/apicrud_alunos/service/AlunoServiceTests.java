@@ -181,20 +181,58 @@ class AlunoServiceTests {
 
 	@Test
 	void removerApagaOAluno() {
-		Aluno existente = aluno(1L, "Ana Souza", "ana@escola.com");
-		when(repository.findById(1L)).thenReturn(Optional.of(existente));
+		when(repository.apagarPorId(1L)).thenReturn(1);
 
 		service.remover(1L);
 
-		verify(repository).delete(existente);
+		verify(repository).apagarPorId(1L);
 	}
 
 	@Test
-	void removerInexistenteLancaNaoEncontradoSemApagar() {
-		when(repository.findById(3L)).thenReturn(Optional.empty());
+	void removerInexistenteLancaNaoEncontrado() {
+		when(repository.apagarPorId(3L)).thenReturn(0);
 
 		assertThatThrownBy(() -> service.remover(3L)).isInstanceOf(ResourceNotFoundException.class);
-		verify(repository, never()).delete(any());
+	}
+
+	// QA: dois DELETE do mesmo aluno ao mesmo tempo davam 500. Agora o segundo acha 0 linha apagada e responde 404.
+	@Test
+	void removerRepetidoDaNaoEncontradoNaSegundaVezEnaoErroInterno() {
+		when(repository.apagarPorId(5L)).thenReturn(1, 0);
+
+		service.remover(5L);
+
+		assertThatThrownBy(() -> service.remover(5L)).isInstanceOf(ResourceNotFoundException.class);
+	}
+
+	@Test
+	void removerComIdInvalidoNemChegaAoBanco() {
+		for (Long id : new Long[] { 0L, -1L, null }) {
+			assertThatThrownBy(() -> service.remover(id)).isInstanceOf(InvalidRequestException.class);
+		}
+		org.mockito.Mockito.verifyNoInteractions(repository);
+	}
+
+	// ---------- listar: ordenação só por campos do aluno ----------
+
+	// QA: sort com ";" ou espaço dava 500. Agora é 400, e o banco nem é consultado.
+	@Test
+	void listarComOrdenacaoPorCampoDesconhecidoLancaRequisicaoInvalidaSemConsultarOBanco() {
+		for (String sort : new String[] { "senha", "password", "nome;drop table aluno", "nome desc", "nome.length", "id;select 1", "'", "nome)" }) {
+			assertThatThrownBy(() -> service.listar(null, null, PageRequest.of(0, 20, Sort.by(sort))))
+					.as("sort=%s", sort).isInstanceOf(InvalidRequestException.class)
+					.hasMessageContaining("Campos aceitos");
+		}
+		org.mockito.Mockito.verifyNoInteractions(repository);
+	}
+
+	@Test
+	void listarAceitaOrdenarPorCadaCampoDoAluno() {
+		when(repository.findByNomeContainingIgnoreCase(anyString(), any(Pageable.class))).thenReturn(Page.empty());
+		for (String campo : new String[] { "id", "nome", "email", "dataNascimento", "ativo" }) {
+			service.listar(null, null, PageRequest.of(0, 20, Sort.by(campo)));
+		}
+		verify(repository, org.mockito.Mockito.times(5)).findByNomeContainingIgnoreCase(anyString(), any(Pageable.class));
 	}
 
 	// ---------- listar ----------

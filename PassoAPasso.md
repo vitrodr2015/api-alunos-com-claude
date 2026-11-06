@@ -862,16 +862,34 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **O que continua do parecer da seção 47:** HTTPS (ALB com certificado), deixar de usar o usuário `root` do banco, limite de tentativas de login, tokens não revogáveis e instância única. **Nada mudou na AWS:** as correções só vão para lá numa próxima release.
 - **Erros do caminho:** meu script de edição parou no meio na primeira vez (a linha do `AlunoRequest` tinha o `@Schema` no meio) e reaplicou parte do que já tinha entrado, então refiz só o restante; esqueci dois imports no filtro; o customizer do Swagger não chega aos grupos.
 
+## 49. Release 1.4.1: o deploy falhou na primeira vez (RDS parado) e o que aprendemos (2026-11-05)
+
+- **O que a release leva:** as correções do QA (seção 48) e o health check (Actuator, seção 46). Fluxo: `release/1.4.1` → PR #50 para a `main` (merge `8b9aceb`) → deploy → tag `v1.4.1` → back-merge no PR #51. Sem migrations novas e sem mudança de variáveis na Task Definition.
+- **O que aconteceu (cronologia):**
+  1. O PR #50 foi mesclado e a esteira rodou: **build, 326 testes, `docker compose build` e o envio da imagem ao ECR passaram**. O passo `Deploy to Amazon ECS` **falhou**: `Deployment ... not found after stabilization. The deployment was likely rolled back by the deployment circuit breaker`.
+  2. Eventos do Service (`aws ecs describe-services ... events`): `deployment failed: tasks failed to start` e `rolling back to deployment ...`. Nas tarefas paradas (`aws ecs list-tasks --desired-status STOPPED` + `describe-tasks`): **desde as 21:49, antes da release, a tarefa `:10` (a versão antiga) já morria a cada ~1,5 minuto com `EssentialContainerExited`, código 1**, e o Service a recriava. Ou seja, **o problema não era o código novo**: a aplicação exige o banco no arranque e saía com erro, o que combina com o **RDS parado ou ainda subindo**. O usuário confirmou ("tá startando o RDS, após a release").
+  3. Houve também um evento `CannotPullContainerError ... :8b9aceb...@sha256:... not found` para a imagem nova. O ECR, conferido depois, tinha a imagem com as duas tags (`latest` e a do commit) e o mesmo digest. **A causa exata desse erro de pull não foi determinada** (o perfil `crud-alunos` da CLI não tem permissão de ler o CloudWatch Logs).
+  4. O circuit breaker **reverteu** para a task definition `:10`. Depois que o RDS ficou `Available`, a `:10` voltou a subir e ficou `RUNNING`, e o rollout fechou como `COMPLETED`.
+- **Armadilha do rollback: ficou no ar o código ANTIGO.** O `latest` do ECR já apontava para a imagem nova, mas o rollback reaproveita o **digest** da implantação anterior. Prova: `GET /actuator/health` dava **401** (na 1.4.0 o health não existia). **Verifique sempre pelo comportamento (rota nova) qual versão está rodando, não só pelo "rollout COMPLETED".**
+- **O PR de back-merge ficou `BLOCKED`:** o *head* do #51 era exatamente o commit da `main` (`8b9aceb`), e o check `build` **desse commit** era o deploy que falhou, então a regra do `build` verde barrava o merge. O `gh pr checks` mostrava dois `build`, um `FAILURE` e um `SUCCESS`.
+- **Como resolvi:** com o RDS `Available`, **reexecutei só o job que falhou**: `gh run rerun <id> --failed`. Resultado: `success`, **task definition `:12`**, rollout `COMPLETED` com 1 tarefa. Isso também **destravou o #51** (`mergeStateStatus`: `CLEAN`). Conferido na AWS (IP `100.26.228.111`, muda a cada tarefa): `/actuator/health` → `{"status":"UP"}` (código novo), `/actuator/health/liveness` → `UP`, `GET /alunos` sem token → 401, `/swagger-ui/index.html` → 401 (desligado), `/actuator/env` → 401, `signin` com a senha antiga → 401. Depois: tag `v1.4.1` em `8b9aceb` e merge do #51 (`3624c99`).
+- **Erro meu:** nas releases anteriores eu pedi ao usuário para **confirmar o RDS `Available`** antes do merge na `main`; desta vez conferi só o ECS (`runningCount` 1, que na hora já estava desatualizado) e segui. A regra de `memoria.md` ("antes do merge na `main`, o RDS tem de estar `Available`") existia e eu não a cumpri.
+- **Regras que ficam:**
+  1. **Antes de mesclar na `main`, pedir ao usuário a confirmação de que o RDS está `Available`.** Um `runningCount` 1 na CLI **não** prova isso, porque o ECS pode estar reiniciando tarefas que caem.
+  2. Deploy que falha com `circuit breaker`: olhar os **eventos do Service** e as **tarefas paradas** (`stoppedReason`, `exitCode`) para achar a causa; código de saída 1 logo na subida = a aplicação não conseguiu iniciar (banco, segredo ou variável).
+  3. Depois de um rollback, **confirmar a versão pelo comportamento**; se necessário, `gh run rerun <id> --failed` quando o ambiente estiver certo (reexecuta o build e o deploy do mesmo commit).
+  4. O perfil da CLI (`crud-alunos`) lê ECS, ECR e EC2, mas **não** lê CloudWatch Logs nem RDS: para o log da tarefa, usar o console.
+- **Estado final:** `main` na `1.4.1` (tag `v1.4.1`), `develop` sincronizada (PR #51), AWS na task definition `:12`, 326 testes.
+
 ## Próximos passos
 
-Atualizado no fim do dia 2026-11-04. A seção "Como retomar" do `memoria.md` tem a versão curta.
+Atualizado em 2026-11-05 (noite). A seção "Como retomar" do `memoria.md` tem a versão curta, e o `Playbook.md` é a versão limpa de tudo o que foi feito.
 
-0. **Do QA (seções 47 e 48):** os 6 defeitos de código estão corrigidos (branch `fix/defeitos-qa`); falta decidir, na infraestrutura, **HTTPS** (ALB com certificado) e o **usuário `root` do banco**, e fazer uma release para levar as correções à AWS.
-1. **Testar o Swagger localmente** (primeiro item de 2026-11-05, pedido do usuário): ver "Como testar localmente" na seção 44.
+1. **Testar o Swagger localmente** (pedido do usuário, ainda pendente): ver "Como testar localmente" na seção 44. Armadilhas: usar PowerShell novo (ou o Git Bash com `export`) **fora do VS Code**, e rodar dentro de `apicrud-alunos`.
 2. **Continuar o playbook:** o usuário cola o **Passo 43** (a numeração do playbook é diferente da nossa: playbook 42 = nossa seção 46).
-3. **Decisão do usuário:** ligar ou não o Swagger na AWS (`SWAGGER_ENABLED=true` em `environment` da Task Definition + release). Hoje está desligado lá.
-4. **Ambiente da AWS LIGADO** (RDS e Service). Ao terminar: *Desired tasks* = 0 e RDS *Stop temporarily* (religa sozinho após 7 dias).
-5. **Opcional no console:** apagar o segredo `secrets_crud_alunos/admin-bootstrap-password` e tirar seu ARN da política `LerSecretDB_CrudAlunos` (não é mais usado).
-6. **Sobras na AWS:** `rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos` (sem o "i") e a política `LerSecretDB_CrudAlunos` que ficou numa role errada. Seções 12 a 14 do tutorial da AWS (rotina, problemas comuns, limpeza) ainda não executadas.
-7. **Branches remotas:** `teste-ci-quebrado` nunca foi mesclada, de propósito. As `feature/*` já mescladas só se apagam quando o usuário pedir.
-8. **Limitações de segurança conhecidas:** sem limite de tentativas de login nem bloqueio de conta; sem endpoint para trocar senha nem para dar `ADMIN` a outro usuário (só pelo banco).
+3. **Infraestrutura para produção de verdade (do parecer do QA, seção 47):** **HTTPS** (ALB com certificado e domínio), **usuário próprio do banco** no lugar do `root`, limite de tentativas de login, tokens revogáveis, mais de uma instância e alarmes.
+4. **Decisão do usuário:** ligar ou não o Swagger na AWS (`SWAGGER_ENABLED=true` em `environment` da Task Definition + release). Hoje está desligado lá.
+5. **Ambiente da AWS LIGADO** (RDS e Service). Ao terminar: *Desired tasks* = 0 e RDS *Stop temporarily* (religa sozinho após 7 dias). **Ao religar, esperar o RDS `Available` antes de qualquer deploy (seção 49).**
+6. **Opcional no console:** apagar o segredo `secrets_crud_alunos/admin-bootstrap-password` e tirar seu ARN da política `LerSecretDB_CrudAlunos` (não é mais usado).
+7. **Sobras na AWS:** `rest-with-claude-app-sg`, cluster `rest-with-claude-spring`, repositório `respositorio-crud-alunos` (sem o "i") e a política `LerSecretDB_CrudAlunos` que ficou numa role errada. Seções 12 a 14 do tutorial da AWS (rotina, problemas comuns, limpeza) ainda não executadas.
+8. **Branches remotas:** `teste-ci-quebrado` nunca foi mesclada, de propósito. As `feature/*`, `fix/*` e `release/*` já mescladas só se apagam quando o usuário pedir.

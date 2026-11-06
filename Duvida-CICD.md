@@ -58,6 +58,8 @@
 | Segurança 2/2: segredo da senha do primeiro admin (`secrets_crud_alunos/admin-bootstrap-password`; `ADMIN_BOOTSTRAP_PASSWORD` em `secrets` do `task-definition.json`, só no 1º deploy) | ✅ Segredo criado pelo usuário em 2026-11-03; `task-definition.json` atualizado, **não implantado**. A política `LerSecretDB_CrudAlunos` precisa conter este ARN (a confirmar com o usuário). Depois do 1º deploy, remover a variável do arquivo |
 | Release 1.3.0 (segurança) | ✅ Deploy em 2026-11-03: task definition `:8`, rollout COMPLETED. Pendente: confirmar o login e remover `ADMIN_BOOTSTRAP_PASSWORD` da Task Definition |
 | Release 1.3.1 | ✅ 2026-11-04: `ADMIN_BOOTSTRAP_PASSWORD` tirado da Task Definition; task definition `:9`, rollout COMPLETED. Opcional pendente: apagar o segredo `admin-bootstrap-password` e seu ARN na política |
+| Release 1.4.0 | ✅ 2026-11-04: Swagger (desligado), integração com MySQL real e Postman; task definition `:10`, rollout COMPLETED |
+| Release 1.4.1 | ⚠️ 2026-11-05: **o primeiro deploy falhou** (RDS parado/subindo; o *circuit breaker* reverteu para a `:10`, que ficou com o código antigo). Com o RDS `Available`, `gh run rerun <id> --failed` fez o deploy: task definition `:12`, rollout COMPLETED, `health` público UP. Ver "Problemas e diferenças encontradas" |
 | Swagger na AWS | ⏳ **Não ligado** (decisão do usuário). A aplicação traz o Swagger desligado por padrão; para ligar, `SWAGGER_ENABLED=true` em `environment` da Task Definition + release. Nada foi alterado na AWS |
 | Health check na AWS | ⏳ **Não configurado** (nada foi alterado na AWS). O código já tem `/actuator/health/liveness`; a imagem não tem `curl`/`wget`, então o `healthCheck` dentro do contêiner não foi ligado. Com um ALB, apontar o *target group* para `/actuator/health/liveness` |
 
@@ -458,6 +460,8 @@ Ao final, a porta 3306 do grupo `default` ficou com estas origens:
 
 > ⚠️ Se o teste der timeout, o motivo mais provável é o seu IP de casa ter mudado: em **EC2 → Security Groups → `security-group-crud-alunos`**, edite a regra da 8080 e escolha **My IP** de novo.
 
+> ⚠️ **Antes de qualquer deploy (merge na `main`), espere o RDS ficar `Available`.** Com o RDS parado ou subindo, a aplicação sai com código 1 na subida, o ECS reinicia a tarefa em laço e o *circuit breaker* reverte o deploy (visto na release 1.4.1).
+
 ### 15.2 Desligar
 
 **Passo a passo executado em 2026-10-30:**
@@ -503,3 +507,8 @@ Ao final, a porta 3306 do grupo `default` ficou com estas origens:
 | Esteira verde, mas a API não responde | O Service está com **Desired tasks = 0**, ou o IP mudou. Ligue o Service (seção 15.1) e pegue o IP novo. |
 | Procuro **Desired tasks** e a tela não tem | Você está na página da **Task Definition**. Vá em Clusters → cluster → Services → o Service → **Update**. |
 | Não acho o campo "Endpoint" | Aba **Connectivity & security** → painel **Connect using** → **Endpoints**. |
+| Esteira falha no passo "Deploy to Amazon ECS" com `not found after stabilization ... rolled back by the deployment circuit breaker` | A tarefa nova não ficou saudável. Veja os eventos do Service (`aws ecs describe-services --cluster ... --services ... --query 'services[0].events[0:10]'`) e as tarefas paradas (`aws ecs list-tasks --desired-status STOPPED` e `describe-tasks`: `stoppedReason`, `exitCode`). `EssentialContainerExited` com código 1 logo na subida = a aplicação não conseguiu iniciar; neste projeto a causa foi o **RDS parado ou ainda subindo** (a aplicação exige o banco no arranque). Espere o RDS `Available` e reexecute: `gh run rerun <id> --failed`. |
+| Depois do rollback o Service mostra `COMPLETED` e `RUNNING`, mas a rota nova não existe | O rollback reaproveita o **digest** da imagem anterior, mesmo que o `latest` do ECR já aponte para a nova. Confirme a versão por uma rota nova (aqui, `GET /actuator/health`: 401 = código antigo) e refaça o deploy. |
+| PR de back-merge (`main` → `develop`) fica `BLOCKED` com o `build` "verde" | O *head* do PR é o commit da `main`, cujo check `build` é o **deploy que falhou** (o PR mostra dois `build`, um deles `FAILURE`). Corrija o ambiente e reexecute o job; o PR vira `CLEAN`. |
+| `CannotPullContainerError ... not found` num evento do Service logo depois do push | Visto uma vez, com a imagem presente no ECR (as duas tags e o digest conferidos depois). Causa não determinada (o perfil da CLI não lê o CloudWatch Logs); reexecutar o deploy resolveu. |
+| `aws logs ...` dá `AccessDeniedException` | O perfil `crud-alunos` da CLI lê ECS, ECR e EC2, mas não o CloudWatch Logs nem o RDS. Veja o log da tarefa no console: **ECS → tarefa → Logs**, ou **CloudWatch → Log groups → `/ecs/crud-alunos-task-definition`**. |

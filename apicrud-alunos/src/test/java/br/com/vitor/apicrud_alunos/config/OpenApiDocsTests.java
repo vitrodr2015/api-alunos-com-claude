@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasItems;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -97,6 +98,27 @@ class OpenApiDocsTests {
 				.andExpect(jsonPath("$.paths['/alunos'].post.responses", chaves("201", "400", "401", "409")))
 				.andExpect(jsonPath("$.paths['/alunos'].get.responses", chaves("200", "400", "401")))
 				.andExpect(jsonPath("$.components.schemas.ErrorResponse.properties", chaves("dataHora", "status", "erro", "mensagem")));
+	}
+
+	// o 503 (banco fora do ar) vale para QUALQUER rota e vem com Retry-After
+	@Test
+	void todasAsOperacoesDocumentamOServicoIndisponivel503() throws Exception {
+		mockMvc.perform(get("/v3/api-docs/alunos")).andExpect(status().isOk())
+				.andExpect(jsonPath("$.paths.*.*.responses['503']", hasSize(7)))
+				.andExpect(jsonPath("$.paths['/alunos'].get.responses['503'].headers['Retry-After']").exists())
+				.andExpect(jsonPath("$.paths['/alunos/{id}'].delete.responses['503'].content['application/json'].schema.$ref").value("#/components/schemas/ErrorResponse"));
+		mockMvc.perform(get("/v3/api-docs/autenticacao")).andExpect(status().isOk())
+				.andExpect(jsonPath("$.paths.*.*.responses['503']", hasSize(3)));
+	}
+
+	@Test
+	void ainformacaoDeDataRealEOrdenacaoAceitaEstaoNoTexto() throws Exception {
+		mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
+				.andExpect(jsonPath("$.info.description", containsString("2000-02-30")))
+				.andExpect(jsonPath("$.info.description", containsString("503")))
+				.andExpect(jsonPath("$.components.schemas.AlunoRequest.properties.dataNascimento.description", containsString("exista de verdade")));
+		mockMvc.perform(get("/v3/api-docs/alunos")).andExpect(status().isOk())
+				.andExpect(jsonPath("$.paths['/alunos'].get.description", containsString("dataNascimento")));
 	}
 
 	@Test

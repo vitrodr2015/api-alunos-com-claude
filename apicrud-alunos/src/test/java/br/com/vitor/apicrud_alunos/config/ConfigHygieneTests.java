@@ -93,6 +93,16 @@ class ConfigHygieneTests {
 		assertThat(yml).doesNotContain("show-details: always").doesNotContain("show-details: when-authorized");
 	}
 
+	// QA: com o banco fora do ar a API ficava 30 s pendurada (espera padrão do pool). O limite é curto de propósito.
+	@Test
+	void oTempoDeEsperaPorUmaConexaoDoBancoEhCurto() throws IOException {
+		String yml = ler(APPLICATION_YML);
+		java.util.regex.Matcher achado = java.util.regex.Pattern.compile("connection-timeout:\\s*(\\d+)").matcher(yml);
+
+		assertThat(achado.find()).as("connection-timeout do Hikari definido").isTrue();
+		assertThat(Long.parseLong(achado.group(1))).isLessThanOrEqualTo(10000L);
+	}
+
 	// ---------- task-definition.json (versionado: vai para a AWS) ----------
 
 	@Test

@@ -3,10 +3,13 @@ package br.com.vitor.apicrud_alunos.security;
 import java.io.IOException;
 
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
+
+import br.com.vitor.apicrud_alunos.exception.FalhaDeInfraestrutura;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -23,9 +26,11 @@ public class JwtTokenFilter extends OncePerRequestFilter {
 	private static final String PREFIXO = "Bearer ";
 
 	private final JwtTokenProvider tokenProvider;
+	private final SecurityErrorWriter errorWriter;
 
-	public JwtTokenFilter(JwtTokenProvider tokenProvider) {
+	public JwtTokenFilter(JwtTokenProvider tokenProvider, SecurityErrorWriter errorWriter) {
 		this.tokenProvider = tokenProvider;
+		this.errorWriter = errorWriter;
 	}
 
 	@Override
@@ -42,6 +47,17 @@ public class JwtTokenFilter extends OncePerRequestFilter {
 				SecurityContextHolder.setContext(contexto);
 			} catch (InvalidTokenException e) {
 				SecurityContextHolder.clearContext();
+			} catch (RuntimeException e) {
+				// o token é recarregado do banco: com o banco fora do ar a resposta é 503 (tente de novo), e não 401,
+				// que faria o cliente achar que o token venceu e logar de novo à toa
+				if (!FalhaDeInfraestrutura.bancoIndisponivel(e)) {
+					throw e;
+				}
+				SecurityContextHolder.clearContext();
+				response.setHeader(HttpHeaders.RETRY_AFTER, "5");
+				errorWriter.write(response, HttpStatus.SERVICE_UNAVAILABLE, "Serviço indisponível",
+						"Serviço temporariamente indisponível. Tente novamente em instantes.");
+				return;
 			}
 		}
 		chain.doFilter(request, response);

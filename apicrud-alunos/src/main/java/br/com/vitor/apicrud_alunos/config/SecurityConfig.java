@@ -23,6 +23,7 @@ import br.com.vitor.apicrud_alunos.security.JwtTokenFilter;
 import br.com.vitor.apicrud_alunos.security.JwtTokenProvider;
 import br.com.vitor.apicrud_alunos.security.RestAccessDeniedHandler;
 import br.com.vitor.apicrud_alunos.security.RestAuthenticationEntryPoint;
+import br.com.vitor.apicrud_alunos.security.SecurityErrorWriter;
 
 @Configuration
 @EnableWebSecurity
@@ -30,7 +31,7 @@ public class SecurityConfig {
 
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtTokenProvider tokenProvider,
-			RestAuthenticationEntryPoint entryPoint, RestAccessDeniedHandler accessDeniedHandler,
+			RestAuthenticationEntryPoint entryPoint, RestAccessDeniedHandler accessDeniedHandler, SecurityErrorWriter errorWriter,
 			@Value("${springdoc.api-docs.enabled:false}") boolean documentacaoLigada) throws Exception {
 		return http
 				// API com token: não há cookie de sessão, então não há o que o CSRF proteger
@@ -72,7 +73,7 @@ public class SecurityConfig {
 						// REGRA FINAL: o que não tem regra acima é NEGADO (e não "liberado para qualquer logado").
 						// Toda rota nova nasce fechada e só abre quando alguém escrever a regra dela aqui.
 						.anyRequest().denyAll())
-				.addFilterBefore(new JwtTokenFilter(tokenProvider), UsernamePasswordAuthenticationFilter.class)
+				.addFilterBefore(new JwtTokenFilter(tokenProvider, errorWriter), UsernamePasswordAuthenticationFilter.class)
 				.build();
 	}
 

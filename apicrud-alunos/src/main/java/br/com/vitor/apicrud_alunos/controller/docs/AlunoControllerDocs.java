@@ -33,7 +33,8 @@ public interface AlunoControllerDocs {
 	ResponseEntity<AlunoResponse> criar(AlunoRequest request);
 
 	@Operation(summary = "Listar alunos", description = "Lista paginada em **HAL** (`_embedded.alunos`, `_links` e `page`). "
-			+ "Padrão: página 0, 20 por página (máximo 50). Ordene com `sort=campo,asc|desc`.")
+			+ "Padrão: página 0, 20 por página (máximo 50). Ordene com `sort=campo,asc|desc`; campos aceitos: "
+			+ "`id`, `nome`, `email`, `dataNascimento` e `ativo` (outro campo dá 400).")
 	@ApiResponse(responseCode = "200", description = "Página de alunos")
 	@ApiResponse(responseCode = "400", description = "Campo de ordenação inválido ou parâmetro mal formado",
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))

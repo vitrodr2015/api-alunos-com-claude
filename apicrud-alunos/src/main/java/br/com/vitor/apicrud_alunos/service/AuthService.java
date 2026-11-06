@@ -17,7 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import br.com.vitor.apicrud_alunos.dto.RegisterRequest;
 import br.com.vitor.apicrud_alunos.exception.ConflictException;
+import br.com.vitor.apicrud_alunos.exception.FalhaDeInfraestrutura;
 import br.com.vitor.apicrud_alunos.exception.InvalidRequestException;
+import br.com.vitor.apicrud_alunos.exception.ServicoIndisponivelException;
 import br.com.vitor.apicrud_alunos.model.Permission;
 import br.com.vitor.apicrud_alunos.model.User;
 import br.com.vitor.apicrud_alunos.repository.PermissionRepository;
@@ -61,6 +63,10 @@ public class AuthService {
 					.authenticate(UsernamePasswordAuthenticationToken.unauthenticated(username, password));
 			return tokenProvider.createTokenPair((UserDetails) autenticacao.getPrincipal());
 		} catch (AuthenticationException e) {
+			// banco fora do ar não é "senha errada": responde 503 (tente de novo), e não 401 nem 500
+			if (FalhaDeInfraestrutura.bancoIndisponivel(e)) {
+				throw new ServicoIndisponivelException(e);
+			}
 			throw new InvalidCredentialsException();
 		}
 	}

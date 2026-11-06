@@ -80,6 +80,29 @@ class ConfigHygieneTests {
 		assertThat(yml).doesNotContain("SWAGGER_ENABLED:true");
 	}
 
+	// Actuator: SÓ o health é exposto na web (env, beans, heapdump, mappings... vazam configuração), sem detalhes e com os
+	// probes ligados (liveness não depende do banco). O yml de teste repete isto; aqui se confere o PRINCIPAL.
+	@Test
+	void oActuatorExpoeSoOHealthSemDetalhesEComProbes() throws IOException {
+		String yml = ler(APPLICATION_YML).replace("\r", "");
+
+		assertThat(yml).contains("management:\n  endpoints:\n    web:\n      exposure:\n        include: health\n");
+		assertThat(yml).doesNotContain("include: *").doesNotContain("include: \"*\"");
+		assertThat(yml).contains("probes:\n        enabled: true");
+		assertThat(yml).contains("show-details: never").contains("show-components: never");
+		assertThat(yml).doesNotContain("show-details: always").doesNotContain("show-details: when-authorized");
+	}
+
+	// QA: com o banco fora do ar a API ficava 30 s pendurada (espera padrão do pool). O limite é curto de propósito.
+	@Test
+	void oTempoDeEsperaPorUmaConexaoDoBancoEhCurto() throws IOException {
+		String yml = ler(APPLICATION_YML);
+		java.util.regex.Matcher achado = java.util.regex.Pattern.compile("connection-timeout:\\s*(\\d+)").matcher(yml);
+
+		assertThat(achado.find()).as("connection-timeout do Hikari definido").isTrue();
+		assertThat(Long.parseLong(achado.group(1))).isLessThanOrEqualTo(10000L);
+	}
+
 	// ---------- task-definition.json (versionado: vai para a AWS) ----------
 
 	@Test

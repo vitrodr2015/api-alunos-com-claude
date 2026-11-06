@@ -148,8 +148,71 @@ class GlobalExceptionHandlerTests {
 				.andExpect(jsonPath("$.mensagem").value("Erro interno do servidor"));
 	}
 
+	// ---------- infraestrutura: banco fora do ar = 503; URL mal codificada = 400 (QA) ----------
+
+	@Test
+	void bancoForaDoArRetorna503ComRetryAfterESemVazarDetalhes() throws Exception {
+		mockMvc.perform(get("/fake/banco-fora"))
+				.andExpect(status().isServiceUnavailable())
+				.andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Retry-After", "5"))
+				.andExpect(jsonPath("$.status").value(503))
+				.andExpect(jsonPath("$.erro").value("Serviço indisponível"))
+				.andExpect(jsonPath("$.mensagem").value(containsString("indisponível")))
+				.andExpect(content().string(not(containsString("jdbc"))))
+				.andExpect(content().string(not(containsString("segredo"))));
+	}
+
+	@Test
+	void bancoForaDoArEmbrulhadoEmOutraExcecaoTambemRetorna503() throws Exception {
+		mockMvc.perform(get("/fake/banco-fora-embrulhado")).andExpect(status().isServiceUnavailable())
+				.andExpect(jsonPath("$.erro").value("Serviço indisponível"))
+				.andExpect(content().string(not(containsString("host-do-banco"))));
+	}
+
+	@Test
+	void erroDeTransacaoQueNaoEDoBancoForaDoArContinuaSendo500() throws Exception {
+		mockMvc.perform(get("/fake/erro-de-commit")).andExpect(status().isInternalServerError())
+				.andExpect(jsonPath("$.mensagem").value("Erro interno do servidor"));
+		mockMvc.perform(get("/fake/erro-comum")).andExpect(status().isInternalServerError());
+	}
+
+	@Test
+	void parametroDaUrlMalCodificadoRetorna400() throws Exception {
+		mockMvc.perform(get("/fake/parametro-ruim")).andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.mensagem").value("Parâmetro da URL com codificação inválida"))
+				.andExpect(content().string(not(containsString("%ZZ"))));
+	}
+
 	@RestController
 	static class FakeController {
+
+		@GetMapping("/fake/banco-fora")
+		String bancoFora() {
+			throw new org.springframework.transaction.CannotCreateTransactionException("jdbc:mysql://segredo:3306/x indisponivel");
+		}
+
+		@GetMapping("/fake/banco-fora-embrulhado")
+		String bancoForaEmbrulhado() {
+			throw new RuntimeException("falha qualquer", new org.springframework.dao.DataAccessResourceFailureException(
+					"Unable to acquire JDBC Connection", new java.sql.SQLTransientConnectionException("host-do-banco: timeout")));
+		}
+
+		@GetMapping("/fake/erro-de-commit")
+		String erroDeCommit() {
+			throw new org.springframework.transaction.TransactionSystemException("Could not commit JPA transaction");
+		}
+
+		@GetMapping("/fake/erro-comum")
+		String erroComum() {
+			throw new IllegalStateException("bug do programador");
+		}
+
+		@GetMapping("/fake/parametro-ruim")
+		String parametroRuim() {
+			throw new org.apache.tomcat.util.http.InvalidParameterException("Character decoding failed. Parameter [nome] with value [%ZZ]");
+		}
+
 
 		@GetMapping("/fake/nao-encontrado")
 		String naoEncontrado() {

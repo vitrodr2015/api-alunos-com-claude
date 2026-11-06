@@ -41,6 +41,34 @@ class UserServiceTests {
 		verify(repository).findByUserName("maria");
 	}
 
+	// QA: o MySQL compara sem diferenciar acentos, então "joão" achava o usuário "joao". O nome é conferido de novo.
+	@Test
+	void loadUserByUsernameNaoAceitaNomeQueSoDifereNoAcento() {
+		User existente = new User();
+		existente.setUserName("joao");
+		when(repository.findByUserName("joão")).thenReturn(Optional.of(existente)); // o que o banco devolveria
+
+		assertThatThrownBy(() -> service.loadUserByUsername("joão")).isInstanceOf(UsernameNotFoundException.class);
+	}
+
+	@Test
+	void loadUserByUsernameContinuaIgnorandoMaiusculas() {
+		User existente = new User();
+		existente.setUserName("maria");
+		when(repository.findByUserName("MARIA")).thenReturn(Optional.of(existente));
+
+		assertThat(service.loadUserByUsername("MARIA")).isSameAs(existente);
+	}
+
+	@Test
+	void loadUserByUsernameNaoAceitaEspacoNoFimQueOBancoIgnora() {
+		User existente = new User();
+		existente.setUserName("maria");
+		when(repository.findByUserName("maria ")).thenReturn(Optional.of(existente));
+
+		assertThatThrownBy(() -> service.loadUserByUsername("maria ")).isInstanceOf(UsernameNotFoundException.class);
+	}
+
 	@Test
 	void loadUserByUsernameLancaUsernameNotFoundQuandoNaoExiste() {
 		when(repository.findByUserName("ninguem")).thenReturn(Optional.empty());

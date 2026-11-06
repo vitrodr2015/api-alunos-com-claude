@@ -22,7 +22,10 @@ public class UserService implements UserDetailsService {
 	@Override
 	@Transactional(readOnly = true)
 	public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+		// O MySQL compara sem diferenciar acentos (collation utf8mb4_unicode_ci): "admín" acharia o usuário "admin".
+		// Por isso o nome que veio é conferido de novo aqui, ignorando só as maiúsculas (o cadastro também as ignora).
 		return repository.findByUserName(username)
+				.filter(usuario -> usuario.getUsername().equalsIgnoreCase(username))
 				.orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
 	}
 

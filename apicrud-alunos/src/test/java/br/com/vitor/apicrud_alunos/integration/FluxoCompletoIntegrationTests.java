@@ -287,9 +287,102 @@ class FluxoCompletoIntegrationTests extends AbstractIntegrationTest {
 	@Test
 	void rotasSemRegraECaminhosSensiveisSaoNegadosAteParaOAdministrador() {
 		String admin = tokenDoAdmin();
-		for (String caminho : List.of("/actuator/env", "/actuator/health", "/h2-console", "/.env", "/rota-que-nao-existe")) {
+		for (String caminho : List.of("/actuator/env", "/actuator/beans", "/actuator/heapdump", "/h2-console", "/.env", "/rota-que-nao-existe")) {
 			given().auth().oauth2(admin).get(caminho).then().statusCode(403);
 			given().get(caminho).then().statusCode(401);
+		}
+	}
+
+	// health check com o MySQL REAL: o /actuator/health completo inclui o banco; público, só o status, sem detalhes
+	@Test
+	void healthEPublicoEUPComOMySqlReal() {
+		given().get("/actuator/health").then().statusCode(200).body("status", equalTo("UP")).body("components", org.hamcrest.Matchers.nullValue());
+		given().get("/actuator/health/liveness").then().statusCode(200).body("status", equalTo("UP"));
+		given().get("/actuator/health/readiness").then().statusCode(200).body("status", equalTo("UP"));
+		// só o health: o resto do Actuator continua fechado, até com token de ADMIN
+		given().auth().oauth2(tokenDoAdmin()).get("/actuator/env").then().statusCode(403);
+	}
+
+	// ---------- correções dos defeitos do QA, contra o MySQL e o Tomcat REAIS ----------
+
+	// QA 1: 20 DELETE simultâneos do mesmo aluno davam 8 erros 500 (leitura e depois exclusão, sem atomicidade)
+	@Test
+	void vinteDeletesSimultaneosDoMesmoAlunoDao1x204E19x404SemErro500() throws Exception {
+		String token = tokenDoAdmin();
+		int id = criarAluno(token, emailUnico());
+		java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(20);
+		List<Integer> codigos = new java.util.ArrayList<>();
+		try {
+			java.util.concurrent.CountDownLatch largada = new java.util.concurrent.CountDownLatch(1);
+			List<java.util.concurrent.Future<Integer>> futuros = new java.util.ArrayList<>();
+			for (int i = 0; i < 20; i++) {
+				futuros.add(pool.submit(() -> {
+					largada.await();
+					return given().auth().oauth2(token).delete("/alunos/{id}", id).statusCode();
+				}));
+			}
+			largada.countDown();
+			for (java.util.concurrent.Future<Integer> futuro : futuros) {
+				codigos.add(futuro.get(60, java.util.concurrent.TimeUnit.SECONDS));
+			}
+		} finally {
+			pool.shutdownNow();
+		}
+		assertThat(codigos).containsOnly(204, 404);
+		assertThat(codigos.stream().filter(codigo -> codigo == 204).count()).isEqualTo(1);
+		given().auth().oauth2(token).get("/alunos/{id}", id).then().statusCode(404);
+	}
+
+	// QA 2: "2000-02-30" era aceita e gravada como 2000-02-29 (correção silenciosa do dado)
+	@Test
+	void dataQueNaoExisteDa400EDiaBissextoValidoFunciona() {
+		String token = tokenDoAdmin();
+		for (String data : List.of("2000-02-30", "2001-02-29", "2023-04-31")) {
+			given().auth().oauth2(token).contentType(ContentType.JSON)
+					.body(json("nome", "Aluno Data", "email", emailUnico(), "dataNascimento", data))
+					.post("/alunos").then().statusCode(400);
+		}
+		given().auth().oauth2(token).contentType(ContentType.JSON)
+				.body(json("nome", "Aluno Bissexto", "email", emailUnico(), "dataNascimento", "2000-02-29"))
+				.post("/alunos").then().statusCode(201).body("dataNascimento", equalTo("2000-02-29"));
+	}
+
+	// QA 4: sort com ";" ou espaço dava 500
+	@Test
+	void sortEstranhoDa400EnaoErro500EATabelaContinuaIntacta() {
+		String token = tokenDoAdmin();
+		for (String sort : List.of("nome;drop table aluno", "nome desc", "password", "nome.length")) {
+			given().auth().oauth2(token).queryParam("sort", sort).get("/alunos").then().statusCode(400).body("status", equalTo(400));
+		}
+		given().auth().oauth2(token).get("/alunos").then().statusCode(200);
+	}
+
+	// QA 5: percentual inválido na query string (?nome=%ZZ) dava 500; é erro do cliente (400)
+	@Test
+	void parametroComPercentualInvalidoDa400EnaoErro500() throws Exception {
+		String token = tokenDoAdmin();
+		for (String consulta : List.of("nome=%ZZ", "nome=%u0041", "nome=%", "nome=%4")) {
+			String resposta = requisicaoCrua("GET /alunos?" + consulta + " HTTP/1.1", token);
+			assertThat(resposta).as("consulta %s", consulta).startsWith("HTTP/1.1 400");
+		}
+		given().auth().oauth2(token).queryParam("nome", "%").get("/alunos").then().statusCode(200);
+	}
+
+	// QA 6: o MySQL compara sem diferenciar acentos; "admín.integracao" entrava como "admin.integracao"
+	@Test
+	void loginComNomeAcentuadoNaoEntraComoOutroUsuarioNoMySqlReal() {
+		entrar("admín.integracao", SENHA_ADMIN).then().statusCode(401);
+		entrar("admin.integracao ", SENHA_ADMIN).then().statusCode(401);
+		entrar("ADMIN.INTEGRACAO", SENHA_ADMIN).then().statusCode(200); // as maiúsculas continuam sendo ignoradas
+	}
+
+	private String requisicaoCrua(String linhaDeRequisicao, String token) throws java.io.IOException {
+		try (java.net.Socket socket = new java.net.Socket("localhost", porta)) {
+			socket.setSoTimeout(10000);
+			String pedido = linhaDeRequisicao + "\r\nHost: localhost\r\nAuthorization: Bearer " + token
+					+ "\r\nConnection: close\r\n\r\n";
+			socket.getOutputStream().write(pedido.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+			return new String(socket.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
 		}
 	}
 

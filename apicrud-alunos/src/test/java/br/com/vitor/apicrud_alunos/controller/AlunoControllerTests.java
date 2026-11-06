@@ -117,6 +117,34 @@ class AlunoControllerTests {
 				.andExpect(status().isBadRequest());
 	}
 
+	// QA: "2000-02-30" era aceita e gravada como 2000-02-29 (correção silenciosa do dado). Agora é 400.
+	@Test
+	void criarComDataQueNaoExisteRetorna400EnaoCorrigeEmSilencio() throws Exception {
+		for (String data : new String[] { "2000-02-30", "2001-02-29", "2023-04-31", "2023-06-31", "2023-13-01", "2023-00-10", "2023-06-00", "1900-02-29" }) {
+			mockMvc.perform(post("/alunos").contentType(MediaType.APPLICATION_JSON)
+					.content(corpo("Caio Alves", emailUnico(), data)))
+					.andExpect(status().isBadRequest());
+		}
+	}
+
+	@Test
+	void criarComDiaBissextoValidoFunciona() throws Exception {
+		mockMvc.perform(post("/alunos").contentType(MediaType.APPLICATION_JSON)
+				.content(corpo("Bia Bissexta", emailUnico(), "2000-02-29")))
+				.andExpect(status().isCreated()).andExpect(jsonPath("$.dataNascimento").value("2000-02-29"));
+	}
+
+	@Test
+	void atualizarComDataQueNaoExisteRetorna400ENaoMudaOAluno() throws Exception {
+		String email = emailUnico();
+		long id = criar("Edu Data", email);
+
+		mockMvc.perform(put("/alunos/" + id).contentType(MediaType.APPLICATION_JSON)
+				.content(corpo("Edu Data", email, "2001-02-29"))).andExpect(status().isBadRequest());
+
+		mockMvc.perform(get("/alunos/" + id)).andExpect(jsonPath("$.dataNascimento").value("2000-01-01"));
+	}
+
 	@Test
 	void criarComEmailRepetidoRetorna409IgnorandoMaiusculas() throws Exception {
 		String email = emailUnico();
@@ -211,8 +239,25 @@ class AlunoControllerTests {
 	void listarOrdenandoPorCampoInexistenteRetorna400() throws Exception {
 		mockMvc.perform(get("/alunos").param("sort", "senha")).andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.erro").value("Requisição inválida"))
-				.andExpect(jsonPath("$.mensagem").value(containsString("'senha'")));
+				.andExpect(jsonPath("$.mensagem").value(containsString("Campos aceitos")));
 		mockMvc.perform(get("/alunos").param("sort", "nome,sideways")).andExpect(status().isBadRequest());
+	}
+
+	// QA: sort estranho dava 500; agora é 400 e a listagem normal continua funcionando
+	@Test
+	void listarOrdenandoPorExpressaoEstranhaRetorna400EnaoErro500() throws Exception {
+		for (String sort : new String[] { "nome;drop table aluno", "nome desc", "nome.length", "password", "id;select 1", "nome)" }) {
+			mockMvc.perform(get("/alunos").param("sort", sort)).andExpect(status().isBadRequest())
+					.andExpect(jsonPath("$.mensagem").value(containsString("Campos aceitos")));
+		}
+		mockMvc.perform(get("/alunos").param("size", "1")).andExpect(status().isOk());
+	}
+
+	@Test
+	void listarOrdenandoPorCadaCampoDoAlunoFunciona() throws Exception {
+		for (String campo : new String[] { "id", "nome", "email", "dataNascimento", "ativo" }) {
+			mockMvc.perform(get("/alunos").param("sort", campo + ",desc").param("size", "3")).andExpect(status().isOk());
+		}
 	}
 
 	@Test

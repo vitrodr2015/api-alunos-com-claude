@@ -898,6 +898,13 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Decisões de desenho:** os prompts são neutros (nada depende de recurso de uma ferramenta; só o prompt de abertura cita os dois nomes de arquivo de contexto); as regras comuns (anotar, provar, não mexer na nuvem, atualizar o Swagger) ficam só no prompt de abertura; as etapas 10 e 13 mandam o agente **propor um plano e esperar o OK**; as etapas de nuvem (17, 18, 19) **proíbem o agente de executar** no console ou de mesclar sem o "pode" (o incidente do deploy da 1.4.1 virou texto do prompt da etapa 19); cada "pronto quando" é o mesmo da colinha e as sabotagens trazem a lição de cada passo (por exemplo, `denyAll`, tipo do token, data estrita, `sort` com lista fixa).
 - **Limite honesto:** os prompts são um ponto de partida e **não foram testados com a ferramenta** em uma API nova; o teste de verdade é seguir a colinha numa API pequena e corrigir as lacunas.
 
+## 52. "Por quê" em cada etapa da colinha (2026-11-07)
+
+- **Pedido do usuário:** a `Colinha-Nova-API.md` passa a explicar, em cada etapa, por que fazê-la e o que ela resolve.
+- **Como ficou:** cada uma das 21 etapas ganhou uma linha **"Por quê:"** (uma frase, em palavras simples) antes da linha do que fazer. Cada etapa tem agora três linhas: por quê, o que fazer e pronto quando. O arquivo continua limpo (sem coluna nova e sem mais destaques).
+- **De onde vêm os textos:** de problemas reais deste projeto (o `${DB_PASSWORD}` ausente que o Spring não acusa, o CRUD feito antes do banco e reescrito, as datas corrigidas em silêncio, o admin inicial com senha mostrada numa conversa, o 401 enganoso com o banco fora do ar, o rollback que deixou o código antigo no ar). Onde não houve incidente, o texto descreve o risco, sem inventar um caso.
+- **Não aplicado no `Colinha-Prompts.md`:** ele é para copiar e colar no agente, e um texto explicativo no meio atrapalha.
+
 ## Próximos passos
 
 Atualizado em 2026-11-05 (noite). A seção "Como retomar" do `memoria.md` tem a versão curta, e o `Playbook.md` é a versão limpa de tudo o que foi feito.

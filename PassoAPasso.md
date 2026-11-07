@@ -920,6 +920,13 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **O que ficou como "não feito no projeto de referência" (e está marcado no texto):** limites de abuso (módulo 13), HTTPS com ALB e ACM e usuário de banco mínimo (módulo 17), alarmes e backups testados (módulo 20).
 - **Continua sem validação prática** (seguir só o playbook numa API nova).
 
+## 55. Playbook2 em formato Notion (2026-11-07)
+
+- **Pedido do usuário:** o `Playbook2.md` num formato mais limpo e próprio para **importar no Notion**, num arquivo único, salvo na Área de Trabalho.
+- **Como foi feito:** um conversor, `tools/playbook2-para-notion.js`, lê o `Playbook2.md` (a **fonte**) e gera `Playbook2 - API profissional (Spring Boot + MySQL + AWS).md`. Uso, na raiz do repositório: `node tools/playbook2-para-notion.js "<pasta-de-saida>"`. A Área de Trabalho do usuário fica dentro do OneDrive (`C:UsersrodrOneDriveDesktop`); o arquivo gerado **não** entra no repositório.
+- **O que muda no arquivo gerado:** títulos limitados a 3 níveis (o Notion só tem H1 a H3: Partes e Blocos viram H1, módulos e seções dos apêndices H2, os rótulos de cada módulo H3); **Objetivo e Por quê numa citação** no topo de cada módulo; **Decisões e Entregáveis em listas**; **"Pronto quando" em caixas de seleção** (`- [ ]`); **Armadilhas em tabela** (Sintoma, Causa, Correção; "—" quando falta a causa); blocos de código **dentro dos itens das listas numeradas** (para a numeração não reiniciar); negrito em excesso removido; separadores `---` e o título H1 removidos (o Notion usa o nome do arquivo como título); subtítulos em negrito do runbook viram H3.
+- **Conferido no arquivo gerado:** 21 módulos, blocos de código em número par, nenhuma armadilha no formato antigo, nenhuma tabela com número errado de colunas, nenhum `??` nem `---` solto. Na primeira versão do conversor apareceram quatro defeitos (armadilhas sem "Causa" não viravam linha de tabela, um `---` entrando no último item de "Entregáveis", o `?` perdido nas perguntas de "Decisões" e um patch meu que falhou por escape de shell), todos corrigidos.
+- **Limites honestos:** a importação **não foi testada no Notion** (não tenho acesso aqui); sugestão: importar o arquivo e conferir primeiro as tabelas, as caixas de seleção e os blocos de código. As mudanças feitas no Notion **não voltam** para o repositório: edite o `Playbook2.md` e gere o arquivo de novo.
 ## 56. Parâmetros com exemplos e Playbook2-Prompts.md (2026-11-07)
 
 - **Pedido do usuário:** os marcadores (`<api>`, `<Recurso>` etc.) do Playbook2 deviam vir acompanhados de exemplo; e um documento de prompts para cada módulo do Playbook2.

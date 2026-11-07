@@ -20,7 +20,42 @@ Documentos irmãos: `Colinha-Nova-API.md` (a lista curta das etapas), `Colinha-P
 | Contêiner e CI | Docker, GitHub Actions | |
 | Nuvem | AWS: ECR, ECS Fargate, RDS MySQL, Secrets Manager, IAM, CloudWatch e (para produção real) ALB + ACM | região de exemplo: `us-east-1` |
 
-**Convenções de texto:** `<api>` = nome da API; `<Recurso>` e `<recurso>` = a entidade principal; `<id-da-conta>`, `<dominio>` e `<IP>` = marcadores. **Nunca** coloque valores reais (conta, IP, endpoint, senha) em arquivo versionado de repositório público.
+## Parâmetros do projeto
+
+Os textos usam marcadores entre `<` e `>`. **Troque todos pelos seus valores.** Os exemplos abaixo são **fictícios** e formam um conjunto único e coerente (a API `loja-api`, com o recurso `Produto`), usado em todo o documento.
+
+| Marcador | O que é | Exemplo | Regra |
+| --- | --- | --- | --- |
+| `<api>` | nome da API (artefato, imagem, serviço) | `loja-api` | minúsculas, com hífen |
+| `<banco>` | nome do banco (database) | `loja_api` | minúsculas, com sublinhado (hífen exigiria aspas no MySQL) |
+| `<grupo>` | pacote base do Java | `br.com.acme` | domínio invertido |
+| `<Recurso>` | a entidade principal (classe) | `Produto` | singular, começa com maiúscula |
+| `<recurso>` | o mesmo, em variável e tabela | `produto` | singular, minúsculas |
+| `<recursos>` | o mesmo, na rota | `produtos` | plural, minúsculas |
+| `<pasta-do-projeto>` | pasta onde está o `pom.xml` | `loja-api` | |
+| `<usuario>` | prefixo da imagem local | `acme` | a imagem fica `acme/loja-api` |
+| `<id-da-conta>` | ID da conta AWS | `123456789012` | 12 dígitos; o do exemplo é fictício; **nunca o real** em arquivo versionado |
+| `<regiao>` | região da AWS | `us-east-1` | |
+| `<repositorio>` | repositório de imagens (ECR) | `loja-api` | o nome não muda depois de criado |
+| `<cluster>` | cluster do ECS | `loja-cluster` | |
+| `<service>` | serviço do ECS | `loja-service` | |
+| `<task-definition>` | definição da tarefa | `loja-task` | |
+| `<nome-do-conteiner>` | contêiner dentro da tarefa | `loja-container` | |
+| `<prefixo>` | prefixo dos segredos | `loja` | os segredos viram `loja/db-password` e `loja/jwt-secret` |
+| `<endpoint-do-rds>` | endereço do banco no RDS | `loja-db.abc123.us-east-1.rds.amazonaws.com` | o do exemplo é fictício |
+| `<IP>` | o seu IP | `203.0.113.10` | faixa reservada para documentação; na regra do firewall, com `/32` |
+| `<dominio>` | domínio da API | `api.exemplo.com` | |
+
+**Exemplo preenchido** (módulo 4, o MySQL local, com os valores do exemplo):
+
+```bash
+docker run -d --name mysql-dev \
+  -e MYSQL_ROOT_PASSWORD="$SENHA_DEV" -e MYSQL_DATABASE=loja_api \
+  -p 3307:3306 -v mysql-dev-data:/var/lib/mysql mysql:8.4 \
+  --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+```
+
+**Nunca** coloque valores reais (conta, IP, endpoint, senha) em arquivo versionado de repositório público.
 
 ---
 
@@ -124,7 +159,7 @@ Decida e registre **antes** de escrever código. As escolhas de pilha já estão
 **Decisões.** O fluxo de branches (Git Flow: `main`, `develop`, `feature/*`, `release/X.Y.Z`); repositório público ou privado (as regras de proteção podem não valer em repositório **privado de conta gratuita**).
 
 **Como.**
-1. Gere o projeto em `start.spring.io`: Maven, Java 25, Spring Boot 4.1.x, grupo `<grupo>`, artefato `<api>`, dependências mínimas (Spring Web, que no Boot 4 é `spring-boot-starter-webmvc`, e DevTools). Mantenha o Maven Wrapper.
+1. Gere o projeto em `start.spring.io`: Maven, Java 25, Spring Boot 4.1.x, grupo `<grupo>`, artefato `<api>` (nos exemplos: `br.com.acme` e `loja-api`), dependências mínimas (Spring Web, que no Boot 4 é `spring-boot-starter-webmvc`, e DevTools). Mantenha o Maven Wrapper.
 2. `git init`, primeiro commit, repositório no GitHub (`gh repo create`), branches `main` e `develop`.
 3. Crie o workflow de CI (modelo no apêndice D4): `mvn -B verify` em push na `main` e em PR para `main`, `develop` e `release/**`.
 4. **Rode o workflow uma vez** (abra um PR qualquer). Só depois, em *Settings → Rules → Rulesets*, crie as regras para `main`, `develop` e `release/**`: PR obrigatório (0 aprovações, se for projeto individual), check **`build`** obrigatório com a branch atualizada, sem force push; em `main` e `develop`, sem apagar a branch.
@@ -239,12 +274,12 @@ aplicacao.addListeners((ApplicationEnvironmentPreparedEvent evento) -> {
 
 ```bash
 docker run -d --name mysql-dev \
-  -e MYSQL_ROOT_PASSWORD="$SENHA_DEV" -e MYSQL_DATABASE=<api> \
+  -e MYSQL_ROOT_PASSWORD="$SENHA_DEV" -e MYSQL_DATABASE=<banco> \
   -p 3307:3306 -v mysql-dev-data:/var/lib/mysql mysql:8.4 \
   --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
 ```
 
-   A senha de desenvolvimento vem de variável do shell e nunca de arquivo versionado.
+   A senha de desenvolvimento vem de variável do shell e nunca de arquivo versionado. Com os exemplos da tabela de parâmetros, o banco é `loja_api`.
 2. **Dependências** (apêndice D1): `spring-boot-starter-data-jpa`, `mysql-connector-j` (runtime), `spring-boot-starter-flyway` e `flyway-mysql` (no Boot 4 o `flyway-core` sozinho não autoconfigura), `h2` (teste).
 3. **Datasource e JPA** no `application.yml`: `ddl-auto: validate`, `open-in-view: false`, `flyway.enabled: true`.
 4. **`V1__create_table_<recurso>.sql`**, com a unicidade **no banco**:
@@ -715,7 +750,7 @@ docker network create qa-net
 docker run -d --name qa-mysql --network qa-net -e MYSQL_ROOT_PASSWORD="$SENHA_QA" mysql:8.4
 docker build -t qa-<api> <pasta-do-projeto>/   # a imagem de produção
 docker run -d --name qa-app --network qa-net -p 8081:8080 \
-  -e DB_USER=root -e DB_URL='jdbc:mysql://qa-mysql:3306/<api>?createDatabaseIfNotExist=true' \
+  -e DB_USER=root -e DB_URL='jdbc:mysql://qa-mysql:3306/<banco>?createDatabaseIfNotExist=true' \
   -e DB_PASSWORD="$SENHA_QA" -e JWT_SECRET="$(openssl rand -hex 32)" \
   -e ADMIN_BOOTSTRAP_PASSWORD="$SENHA_ADMIN_QA" qa-<api>
 ```
@@ -749,7 +784,7 @@ docker run -d --name qa-app --network qa-net -p 8081:8080 \
 
 **Decisões.** Região; nomes dos recursos; quem executa (**o console é de uma pessoa, não do agente**); domínio e HTTPS.
 
-**Como.** Siga esta ordem. (Os detalhes de tela, que mudam com o tempo, ficam no `Duvida-CICD.md`.)
+**Como.** Siga esta ordem. (Os detalhes de tela, que mudam com o tempo, ficam no `Duvida-CICD.md`.) Nos exemplos: repositório `loja-api`, cluster `loja-cluster`, serviço `loja-service`, tarefa `loja-task`, contêiner `loja-container` e segredos `loja/db-password` e `loja/jwt-secret`.
 
 1. **Banco (RDS):** *Aurora and RDS → Create database → Full configuration*, **MySQL 8.4**, template **Sandbox**, **Single-AZ**, instância **`db.t4g.micro`**, **20 GiB** (gp3), **Self managed** credentials, usuário `root` com senha forte (que **não** vai para o Git). **Confira o *Estimated monthly costs* antes de criar** (os padrões custam cerca de US$ 145/mês). *Public access*: **No** em produção; **Yes** só se você precisar de acesso do seu computador, com regra por **My IP**. O database é criado pela própria aplicação (`createDatabaseIfNotExist=true`).
 2. **ECR:** repositório **privado** `<repositorio>` (o nome não pode ser alterado depois e reaparece na Task Definition, no `docker push` e no workflow).
@@ -923,7 +958,7 @@ spring:
     name: <api>
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${DB_URL:jdbc:mysql://localhost:3307/<api>?createDatabaseIfNotExist=true}
+    url: ${DB_URL:jdbc:mysql://localhost:3307/<banco>?createDatabaseIfNotExist=true}
     username: ${DB_USER:root}
     password: ${DB_PASSWORD}                 # sem padrão
     hikari:
@@ -1073,7 +1108,7 @@ jobs:
     "environment": [
       { "name": "DB_USER", "value": "root" },
       { "name": "TZ", "value": "America/Sao_Paulo" },
-      { "name": "DB_URL", "value": "jdbc:mysql://<endpoint-do-rds>:3306/<api>?createDatabaseIfNotExist=true" }
+      { "name": "DB_URL", "value": "jdbc:mysql://<endpoint-do-rds>:3306/<banco>?createDatabaseIfNotExist=true" }
     ],
     "secrets": [
       { "name": "DB_PASSWORD", "valueFrom": "arn:aws:secretsmanager:<regiao>:<id-da-conta>:secret:<prefixo>/db-password-XXXXXX" },

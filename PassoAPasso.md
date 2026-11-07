@@ -920,6 +920,14 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **O que ficou como "não feito no projeto de referência" (e está marcado no texto):** limites de abuso (módulo 13), HTTPS com ALB e ACM e usuário de banco mínimo (módulo 17), alarmes e backups testados (módulo 20).
 - **Continua sem validação prática** (seguir só o playbook numa API nova).
 
+## 56. Parâmetros com exemplos e Playbook2-Prompts.md (2026-11-07)
+
+- **Pedido do usuário:** os marcadores (`<api>`, `<Recurso>` etc.) do Playbook2 deviam vir acompanhados de exemplo; e um documento de prompts para cada módulo do Playbook2.
+- **`Playbook2.md`:** a linha de "Convenções de texto" virou a seção **"Parâmetros do projeto"**: tabela (marcador, o que é, exemplo, regra) com um conjunto coerente e fictício (`loja-api`, recurso `Produto`, conta `123456789012`, IP `203.0.113.10`, faixa reservada para documentação) e um exemplo preenchido do `docker run`. Entrou o marcador **`<banco>`** (exemplo `loja_api`), separado de `<api>`, porque o hífen do nome da API exigiria aspas no MySQL. Os exemplos também aparecem na primeira ocorrência nos módulos 1, 4 e 17.
+- **`Playbook2-Prompts.md` (novo):** prompt de abertura (vira `CLAUDE.md`/`AGENTS.md`), um prompt **fino** por módulo (0 a 20), que manda o agente ler o módulo no Playbook2 e repete só parâmetros, prova, sabotagem e o que não fazer, e prompts de apoio (fechar etapa, retomar, diagnosticar, revisão crítica, atualizar o Swagger). Módulos 10 e 13 pedem plano antes; 17 e 20 entregam roteiro para o usuário executar; 18 e 19 só com "pode" e RDS Available. O `Colinha-Prompts.md` continua, como a versão neutra quanto à stack.
+- **Arquivo do Notion** refeito com o conversor, já com a tabela de parâmetros.
+- **Continua sem validação prática** (seguir só os documentos numa API nova).
+
 ## Próximos passos
 
 Atualizado em 2026-11-05 (noite). A seção "Como retomar" do `memoria.md` tem a versão curta, e o `Playbook.md` é a versão limpa de tudo o que foi feito.

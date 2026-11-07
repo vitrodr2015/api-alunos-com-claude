@@ -1,78 +1,153 @@
-# Colinha: como criar uma nova API (ordem macro)
+# Colinha: como criar uma nova API
 
-Lista curta de etapas, **na ordem em que eu faria uma próxima API**, com o que aprendemos no projeto de alunos. Para consultar rápido. O "como fazer" de cada etapa está no `Playbook.md` (fase indicada); o registro completo, com datas e saídas reais, no `PassoAPasso.md`.
+A ordem em que eu faria a próxima API, com o que aprendemos no projeto de alunos. Cada etapa tem duas linhas: o que fazer e quando está pronta. O "como fazer" está no `Playbook.md` (fase indicada entre parênteses).
 
-**Como usar:** copie as etapas para o seu projeto como checklist, marque conforme avança e só passe para a próxima quando o "feito quando" estiver provado (teste passando ou resposta real, não "acho que funciona").
-
-> ★ = coisa que fizemos **tarde** neste projeto e que vale fazer **mais cedo** na próxima.
+Regra de uso: só passe para a etapa seguinte quando o "pronto quando" estiver **provado** (teste passando ou resposta real, não "acho que funciona").
 
 ---
 
-## Antes de começar (5 perguntas)
+## Antes de começar
 
-1. Quem usa a API e quem pode fazer o quê? (define autenticação e permissões)
-2. Haverá navegador chamando? (define CORS; se não, deixe a lista vazia)
-3. Quais formatos? (JSON basta; XML/YAML e HAL só se alguém pedir)
-4. Onde vai rodar e quanto pode custar? (define a infraestrutura e o que desligar)
-5. Dados de exemplo podem ir para produção? (se não, nunca em migration de produção)
-
----
-
-## As etapas
-
-| # | Etapa | Feito quando | Detalhe |
-| --- | --- | --- | --- |
-| 0 | **Combinar as regras:** anotações vivas, repositório público = sem segredo, um passo por vez, Git Flow | as regras estão escritas num arquivo de memória | Playbook, Fase 0 |
-| 1 | **Criar o projeto** (Initializr) com as versões casadas: JDK = `pom.xml` = Dockerfile = esteira | `./mvnw clean package` passa | Fase 1 |
-| 2 ★ | **Repositório + Git Flow + proteção das branches + CI mínimo** (build e testes em todo PR) | um PR com teste quebrado fica bloqueado | Fase 7 |
-| 3 | **Camadas e erros:** pacotes (`controller`, `service`, `repository`, `model`, `dto`, `mapper`, `exception`, `config`, `security`), um único `ErrorResponse` e um `GlobalExceptionHandler` | 400, 404, 409, 415 e 500 saem no mesmo formato JSON | Fase 1 |
-| 4 | **Escrever o contrato antes do código:** rotas, campos, regras e erros em tabela | o contrato está num arquivo e alguém o leu | Fase 2 |
-| 5 | **Primeiro CRUD:** controller, service, DTO (entrada e saída), mapper, validação; testes **unitário** (Mockito) e **web** (MockMvc) | todos os endpoints cobrem 200/201/204 e 400/404/409 | Fase 2 |
-| 6 | **Banco local em Docker** (cuidado com a porta ocupada) e **datasource por variáveis**, senha **sem valor padrão**, com mensagem clara se faltar | sem a variável a aplicação para com texto claro; com ela, sobe | Fase 3 |
-| 7 | **Migrations (Flyway) + entidade + repository** com `ddl-auto: validate` | a subida falha se a entidade e o banco divergirem (prove trocando uma coluna) | Fase 3 |
-| 8 ★ | **Testes com banco real desde já:** Testcontainers (MySQL) + REST Assured, com uma classe base e um contêiner único; H2 só para os testes rápidos | o fluxo completo roda contra o MySQL real, com as migrations de verdade | Fase 9 |
-| 9 | **Listagem:** paginação com limites, filtros, **ordenação só por campos permitidos** (lista fixa) e **datas estritas** | `size` gigante é reduzido; `sort` estranho dá 400; `2000-02-30` dá 400 | Fases 4 e 11 |
-| 10 | **Formato de resposta:** JSON como padrão e data/ordem dos campos padronizadas; HAL e XML/YAML só se precisar | o texto exato do JSON está testado | Fase 2 |
-| 11 | **Segurança:** hash de senha (BCrypt), login com **a mesma resposta para qualquer falha**, JWT (access curto e refresh), filtro, 401/403 em JSON, **autorização por rota com `denyAll` no fim**, CORS **vazio por padrão**, primeiro admin por variável de uma execução, **testes com filtros ligados** | rota nova nasce fechada; anônimo 401, sem permissão 403; admin do bootstrap entra | Fase 8 |
-| 12 ★ | **Guardas na esteira:** teste que lê os arquivos reais e proíbe segredo com valor padrão, segredo em `environment`, usuário semeado e `*` no CORS | quebrar a regra de propósito faz um teste falhar | Fase 8 (8.10) |
-| 13 ★ | **Documentação viva:** Swagger **desligado por padrão** (ligado por variável), interfaces `*Docs`, esquema Bearer; coleção do Postman com login automático | o botão Authorize aceita o token e o Execute devolve 200 | Fase 10 |
-| 14 ★ | **Saúde e falha de infraestrutura:** `health` público (use o *liveness* para orquestrador), **banco fora do ar = 503 rápido** (timeout curto, `Retry-After`), logs sem segredo | derrubar o banco de verdade devolve 503 em poucos segundos e a API volta sozinha | Fases 10 e 11 |
-| 15 | **Contêiner:** Dockerfile em duas fases, usuário que não é root, `docker-compose` só para dar nome à imagem | a imagem roda local e responde | Fase 5 |
-| 16 | **Infraestrutura na nuvem**, nesta ordem: banco → registro de imagens → usuário da esteira → cluster → **segredos (e a política na role certa)** → firewall → definição da tarefa → primeira imagem → serviço → teste pelo IP | a API responde no endereço público | Fase 6 |
-| 17 | **Esteira de deploy:** build, testes e imagem em todo PR; **deploy só em push na `main`** | o merge na `main` troca a tarefa e a API nova responde | Fase 7 |
-| 18 | **QA de pré-produção:** testar a **imagem de produção** com um banco real descartável (autorização, tokens, injeção, limites, concorrência, queda do banco, logs, reinício); corrigir e **refazer** | zero respostas 5xx para entrada inválida; nenhum segredo no log | Fase 11 |
-| 19 | **Release:** checklist (banco `Available`, testes verdes, merge na `main`, **verificar pelo comportamento**, tag, back-merge) | a rota nova responde em produção | Fase 12 |
-| 20 | **Operar e anotar:** ligar e desligar o ambiente, custo, rollback, o que deu errado e como se resolveu | o próximo release sai sem surpresa | Fase 12 |
+1. Quem usa a API e quem pode fazer o quê?
+2. Haverá navegador chamando? (se não, CORS fica vazio)
+3. Quais formatos? (JSON basta, na maioria dos casos)
+4. Onde vai rodar e quanto pode custar?
+5. Que dados pessoais ela guarda, e por quanto tempo?
+6. Dados de exemplo podem ir para produção?
 
 ---
 
-## Tamanhos de projeto (o que dá para pular)
+## 1. Fundação
 
-| Se for... | Faça | Pode pular |
+**0. Regras de trabalho** (Fase 0)
+Anotações vivas, repositório sem segredo, um passo por vez, Git Flow.
+Pronto quando: as regras estão escritas num arquivo de memória do projeto.
+
+**1. Projeto, repositório e CI** (Fases 1 e 7)
+Criar o projeto com versões casadas (JDK, `pom.xml`, Dockerfile e esteira). Montar o workflow de build e testes, **rodar uma vez** e só então ativar a proteção das branches exigindo o check.
+Pronto quando: um PR com teste quebrado fica bloqueado.
+
+**2. Contrato da API** (Fase 2)
+Rotas, campos, regras e códigos de erro, em tabela, antes do código.
+Pronto quando: o contrato está num arquivo e foi revisado.
+
+**3. Configuração e segredos** (Fases 3 e 8)
+Tudo por variável de ambiente; segredo sem valor padrão; mensagem clara se faltar; primeiro teste de higiene que proíbe segredo no arquivo.
+Pronto quando: sem a variável a aplicação para com texto claro.
+
+---
+
+## 2. Dados e núcleo da API
+
+**4. Banco, migrations e entidade** (Fase 3)
+Banco local em Docker, migrations versionadas, entidade e repository, `ddl-auto: validate`.
+Pronto quando: trocar o nome de uma coluna na entidade faz a subida falhar.
+
+**5. Camadas e erros padronizados** (Fase 1)
+Pacotes por camada, um único formato de erro e um tratador global.
+Pronto quando: 400, 404, 409, 415 e 500 saem no mesmo JSON.
+
+**6. CRUD em fatia vertical** (Fases 2 e 10)
+Controller, service, DTOs, mapper e validação **estrita** (inclusive datas), com Swagger desde o primeiro endpoint. Testes unitário e web.
+Pronto quando: cada endpoint cobre o caso feliz e os erros 400, 404 e 409; `2000-02-30` dá 400.
+
+**7. Testes com banco real** (Fase 9)
+Testcontainers e REST Assured, com classe base e um contêiner único.
+Pronto quando: o fluxo completo roda contra o banco real, com as migrations de verdade.
+
+**8. Listagem** (Fases 4 e 11)
+Paginação com limites, filtros e ordenação **só por campos permitidos**.
+Pronto quando: tamanho gigante é reduzido e `sort` estranho dá 400.
+
+**9. Formato da resposta** (Fase 2)
+JSON como padrão, com ordem dos campos e datas padronizadas. HAL ou XML só se alguém pedir.
+Pronto quando: o texto exato do JSON está num teste.
+
+---
+
+## 3. Segurança
+
+**10. Autenticação** (Fase 8)
+Usuários e permissões, hash BCrypt, login com a mesma resposta para qualquer falha, JWT (acesso curto e refresh), filtro, 401 e 403 em JSON.
+Pronto quando: o login entra, e token vencido, adulterado ou do tipo errado dá 401.
+
+**11. Autorização e CORS** (Fase 8)
+Regra por rota com `denyAll` no fim; CORS vazio por padrão.
+Pronto quando: rota nova nasce fechada; anônimo recebe 401 e sem permissão recebe 403.
+
+**12. Admin inicial e endurecimento** (Fase 8)
+Primeiro admin por variável usada uma vez; testes com os filtros ligados; guarda que proíbe segredo em `environment`, usuário semeado e `*` no CORS; caminhos sensíveis negados.
+Pronto quando: quebrar cada regra de propósito faz um teste falhar.
+
+**13. Limites de abuso e ciclo de vida do token**
+Limite de tentativas de login; logout e revogação; troca de senha.
+Pronto quando: tentativas em excesso recebem 429 e um token revogado deixa de valer.
+
+---
+
+## 4. Operação
+
+**14. Saúde e falha de infraestrutura** (Fases 10 e 11)
+`health` público (o *liveness* para o orquestrador); banco fora do ar vira 503 rápido, com `Retry-After`; logs sem segredo e sem dado pessoal.
+Pronto quando: derrubar o banco de verdade devolve 503 em segundos, e a API volta sozinha.
+
+**15. Contêiner** (Fases 5 e 7)
+Dockerfile em duas fases, usuário que não é root; a esteira passa a construir a imagem.
+Pronto quando: a imagem roda local e responde.
+
+**16. QA da imagem de produção** (Fase 11)
+Testar a imagem com banco real descartável: autorização, tokens, injeção, limites, concorrência, queda do banco, logs, reinício. Corrigir e **refazer**.
+Pronto quando: nenhuma resposta 5xx para entrada inválida e nenhum segredo no log.
+
+---
+
+## 5. Entrega
+
+**17. Nuvem** (Fase 6)
+Banco, registro de imagens, usuário da esteira, cluster, **todos os segredos** (inclusive JWT e senha do admin inicial) com a política na role certa, firewall, definição da tarefa, serviço. Usuário de banco com privilégio mínimo; **HTTPS e domínio**.
+Pronto quando: a API responde por HTTPS e o banco não é acessado como `root`.
+
+**18. Esteira de deploy** (Fase 7)
+Deploy só em push na `main`.
+Pronto quando: o merge na `main` troca a tarefa e a rota nova responde.
+
+**19. Release** (Fase 12)
+Banco `Available`, testes verdes, merge, **verificar pelo comportamento**, tag, back-merge.
+Pronto quando: a rota nova responde em produção.
+
+**20. Operar e anotar** (Fase 12)
+Alarmes, backups conferidos, custo, rollback, e o que deu errado com a solução.
+Pronto quando: o próximo release sai sem surpresa.
+
+---
+
+## O que dá para pular
+
+| Projeto | Faça | Pode pular |
 | --- | --- | --- |
-| **Protótipo local** | 1, 3, 4, 5, 6, 7, 15 | nuvem, esteira, segurança forte, QA |
-| **API interna** | tudo até a 15, mais 2, 8, 11 (pelo menos autenticação) e 17 | Swagger público, QA completo |
-| **Produção com usuários reais** | **todas**, e na infraestrutura: **HTTPS**, usuário de banco **só com o que precisa** (nunca o `root`), mais de uma instância, alarmes e backups conferidos | nada |
+| Protótipo local | 0 a 6 e 15 | nuvem, esteira, segurança forte, QA |
+| API interna | 0 a 12, 14, 15 e 18 | Swagger público, limites de abuso, QA completo |
+| Produção com usuários reais | todas | nada |
 
 ---
 
-## As 10 regras de ouro
+## Dez regras de ouro
 
-1. **Prova antes de "feito":** teste passando e resposta real.
-2. **Sabote para confirmar** que o teste pega a falha (quebre de propósito e veja falhar).
-3. **Segredo nunca em arquivo versionado;** na nuvem, em `secrets`, nunca em `environment`; um teste garante.
-4. **Negar por padrão** (`denyAll`): rota nova nasce fechada.
-5. **O banco manda, não o token:** permissões e estado da conta são relidos a cada requisição.
-6. **Mesma resposta (e tempo parecido) para qualquer falha de login.**
-7. **Banco fora do ar é 503,** rápido, nunca 401 nem 500.
-8. **Nunca editar migration já aplicada;** corrigir com uma nova.
-9. **Confirmar o banco `Available` antes de mesclar na `main`;** depois do deploy, verificar a versão pelo comportamento (um rollback deixa o código antigo no ar).
-10. **Anotar enquanto faz:** o que deu errado e como se resolveu é a parte mais valiosa.
+1. Prova antes de "feito": teste passando e resposta real.
+2. Sabote de propósito para confirmar que o teste pega a falha.
+3. Segredo nunca em arquivo versionado, e na nuvem sempre em `secrets`.
+4. Negar por padrão: rota nova nasce fechada.
+5. O banco manda, não o token: permissões são relidas a cada requisição.
+6. Mesma resposta, e tempo parecido, para qualquer falha de login.
+7. Banco fora do ar é 503, rápido, nunca 401 nem 500.
+8. Nunca edite migration já aplicada; corrija com uma nova.
+9. Confirme o banco `Available` antes de mesclar na `main` e verifique a versão pelo comportamento depois (um rollback deixa o código antigo no ar).
+10. Anote enquanto faz: o que deu errado e como se resolveu é a parte mais valiosa.
 
 ---
 
-## O que levar de um projeto para o outro
+## Levar para o próximo projeto
 
-- **Arquivos-modelo:** `Dockerfile`, `docker-compose.yml`, `.github/workflows/continuous-deployment.yml`, `task-definition.json` (sem senha), `application.yml` (variáveis, sem segredo), `AbstractIntegrationTest` e o perfil `testcontainers`, `ConfigHygieneTests`, `SecurityConfig` (regras + `denyAll`), `GlobalExceptionHandler` + `ErrorResponse`.
-- **Anotações:** copiar os três arquivos (`PassoAPasso.md`, `memoria.md`, `Duvida-CICD.md`) vazios, com os cabeçalhos, e manter vivos desde o dia 1.
-- **Ideia ainda não feita:** guardar no repositório os scripts de QA (bateria HTTP e fase de banco/logs) para repetir antes de cada release.
+Arquivos-modelo: `Dockerfile`, `docker-compose.yml`, workflow da esteira, `task-definition.json` (sem senha), `application.yml` (só variáveis), `AbstractIntegrationTest`, `ConfigHygieneTests`, `SecurityConfig` e o tratador global de erros. Mais os três arquivos de anotação, vazios, mantidos vivos desde o primeiro dia.
+
+Ainda não feito no projeto de alunos: etapas 13, HTTPS, usuário de banco mínimo, observabilidade e alarmes, varredura de dependências e da imagem, e os scripts de QA guardados no repositório.

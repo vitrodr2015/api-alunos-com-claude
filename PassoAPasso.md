@@ -912,6 +912,14 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **Diferença para o `Playbook.md`:** sem nomes, datas nem números do projeto; os incidentes viraram **armadilhas clássicas**; o "como" de tecnologia fica no **perfil de referência** (Java, Spring Boot, MySQL, Docker, GitHub Actions e AWS), separado dos princípios, que valem para qualquer pilha.
 - **Limite honesto:** ainda **não foi validado** seguindo-o numa API nova; o módulo 13 (limites de abuso) e partes dos módulos 17 e 20 descrevem o que o projeto de referência **não** chegou a fazer.
 
+## 54. Playbook2 com a stack fixa (Spring Boot + MySQL + AWS) (2026-11-07)
+
+- **Pedido do usuário:** o `Playbook2.md` pode **assumir** a stack (Spring Boot, MySQL e AWS), em vez de ser genérico para qualquer pilha.
+- **O que mudou:** saiu a separação "princípio genérico / perfil de referência". Cada módulo ganhou **"Por quê"** e um **"Como" direto e concreto** (comandos, trechos de código, passos do console), mantendo Objetivo, Decisões, Pronto quando, Sabotagem, Armadilhas clássicas e Entregáveis. Entrou uma seção **"Stack assumida"** (com as versões e o aviso para confirmar pacotes do Boot 4) e as **convenções de marcadores**.
+- **Apêndices agora são modelos prontos:** D1 dependências do `pom.xml`, D2 `application.yml`, D3 Dockerfile e compose, D4 workflow completo, D5 esqueleto do `task-definition.json` (sem senha), D6 comandos de leitura da AWS CLI, D7 checklist de release, D8 runbook, D9 baseline de segurança, D10 custo.
+- **O que ficou como "não feito no projeto de referência" (e está marcado no texto):** limites de abuso (módulo 13), HTTPS com ALB e ACM e usuário de banco mínimo (módulo 17), alarmes e backups testados (módulo 20).
+- **Continua sem validação prática** (seguir só o playbook numa API nova).
+
 ## Próximos passos
 
 Atualizado em 2026-11-05 (noite). A seção "Como retomar" do `memoria.md` tem a versão curta, e o `Playbook.md` é a versão limpa de tudo o que foi feito.

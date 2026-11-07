@@ -888,6 +888,9 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **A ordem não é a cronológica deste projeto.** As etapas marcadas com ★ foram feitas tarde aqui e valem ser feitas cedo: CI e proteção de branches logo no início, testes com MySQL real (Testcontainers) já com o banco, guardas de configuração na esteira, Swagger e Postman junto da API, e `health` com o tratamento de banco fora do ar (503) antes de ir para a nuvem.
 - **Ideia ainda não feita:** guardar no repositório os scripts de QA (bateria HTTP e fase de banco/logs) para repetir antes de cada release.
 
+- **Reordenada e simplificada (2026-11-07), a pedido do usuário:** revisão crítica da ordem. Mudanças: o **contrato antes das camadas e dos erros**; o **banco antes do CRUD** (fatia vertical: aqui o CRUD em memória foi reescrito no passo 23); **datas estritas** na validação de entrada (não na listagem); a segurança dividida em quatro etapas (autenticação; autorização e CORS; admin inicial e endurecimento; limites de abuso e ciclo de vida do token); a **proteção das branches só depois de o workflow rodar uma vez** (o ruleset só enxerga o check depois); o **QA da imagem antes da nuvem**; os segredos da segurança (JWT e senha do admin inicial) listados na etapa da nuvem; **HTTPS e usuário de banco mínimo** viraram parte de uma etapa, e não só uma linha da tabela de tamanhos; entrou a pergunta sobre dados pessoais. A tabela de tamanhos teve a linha de "API interna" corrigida (era contraditória).
+- **Formato:** sem a coluna de detalhe e com poucos destaques; cada etapa tem duas linhas (o que fazer e "pronto quando"), agrupadas em cinco blocos (fundação, dados e núcleo, segurança, operação, entrega).
+
 ## Próximos passos
 
 Atualizado em 2026-11-05 (noite). A seção "Como retomar" do `memoria.md` tem a versão curta, e o `Playbook.md` é a versão limpa de tudo o que foi feito.

@@ -905,6 +905,13 @@ DTOs: `AlunoRequest` (entrada) e `AlunoResponse` (saída). A entidade `Aluno` nu
 - **De onde vêm os textos:** de problemas reais deste projeto (o `${DB_PASSWORD}` ausente que o Spring não acusa, o CRUD feito antes do banco e reescrito, as datas corrigidas em silêncio, o admin inicial com senha mostrada numa conversa, o 401 enganoso com o banco fora do ar, o rollback que deixou o código antigo no ar). Onde não houve incidente, o texto descreve o risco, sem inventar um caso.
 - **Não aplicado no `Colinha-Prompts.md`:** ele é para copiar e colar no agente, e um texto explicativo no meio atrapalha.
 
+## 53. Playbook2: guia genérico para criar uma API profissional (2026-11-07)
+
+- **Pedido do usuário:** um segundo playbook, **genérico** (não o passo a passo deste projeto), para criar uma API profissional como a que fizemos.
+- **Arquivo:** `Playbook2.md` (raiz). Estrutura: **Parte A** fundamentos (8 princípios, perfis de projeto, definição de pronto); **Parte B** tabela de decisões iniciais (autenticação, permissões, formatos, banco, onde roda, dados de exemplo, dados pessoais); **Parte C** os **21 módulos** (0 a 20), todos no mesmo molde (Objetivo, Decisões, Como com princípio e perfil de referência, Pronto quando, Sabotagem, Armadilhas clássicas no formato sintoma, causa e correção, Entregáveis); **Parte D** apêndices (modelos de arquivos, checklist de release, runbook de incidentes, baseline de segurança, controle de custo); e como validar o próprio playbook.
+- **Diferença para o `Playbook.md`:** sem nomes, datas nem números do projeto; os incidentes viraram **armadilhas clássicas**; o "como" de tecnologia fica no **perfil de referência** (Java, Spring Boot, MySQL, Docker, GitHub Actions e AWS), separado dos princípios, que valem para qualquer pilha.
+- **Limite honesto:** ainda **não foi validado** seguindo-o numa API nova; o módulo 13 (limites de abuso) e partes dos módulos 17 e 20 descrevem o que o projeto de referência **não** chegou a fazer.
+
 ## Próximos passos
 
 Atualizado em 2026-11-05 (noite). A seção "Como retomar" do `memoria.md` tem a versão curta, e o `Playbook.md` é a versão limpa de tudo o que foi feito.

@@ -8,6 +8,23 @@ export class ErroApi extends Error {
   }
 }
 
+// Altera nome, e-mail e data de nascimento (dataNascimento no formato "aaaa-mm-dd").
+// A API valida e responde 400 (campos inválidos, com a lista na mensagem) ou 409 (e-mail já usado).
+export async function atualizarAluno(id, { nome, email, dataNascimento }) {
+  const token = localStorage.getItem('accessToken')
+  const resposta = await fetch(`/api/alunos/${id}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nome, email, dataNascimento }),
+  })
+
+  if (!resposta.ok) {
+    const erro = await resposta.json().catch(() => null)
+    throw new ErroApi(erro?.mensagem ?? 'Não foi possível alterar o aluno.', resposta.status)
+  }
+  return resposta.json()
+}
+
 // situacao: 'todos' | 'ativos' | 'inativos'  ->  ?ativo=true / ?ativo=false (sem o parâmetro = todos)
 // campoOrdem: 'id' | 'nome' | 'dataNascimento' (nomes dos campos do aluno);  direcaoOrdem: 'asc' | 'desc'
 export async function listarAlunos({

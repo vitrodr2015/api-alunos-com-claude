@@ -1,0 +1,228 @@
+.alunos-pagina {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2.5rem 1rem;
+}
+
+.alunos-cabecalho {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.alunos-cabecalho h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.alunos-subtitulo {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.alunos-botao-sair {
+  padding: 0.5rem 1.1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #374151;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.alunos-botao-sair:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.alunos-erro {
+  margin: 0 0 1rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.875rem;
+}
+
+/* Cartão que envolve a tabela e a paginação */
+.alunos-cartao {
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.alunos-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  transition: opacity 0.15s;
+}
+
+.alunos-tabela-carregando {
+  opacity: 0.55;
+}
+
+.alunos-tabela th,
+.alunos-tabela td {
+  padding: 1rem 1.25rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.alunos-tabela thead th {
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  color: #6b7280;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.alunos-tabela tbody td {
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+}
+
+.alunos-tabela tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.alunos-tabela tbody tr {
+  transition: background 0.12s;
+}
+
+.alunos-tabela tbody tr:hover {
+  background: #f5f8ff;
+}
+
+.alunos-col-id {
+  width: 5rem;
+  color: #9ca3af;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Aluno: avatar + nome em cima, e-mail embaixo */
+.alunos-pessoa {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.alunos-avatar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: #e0e7ff;
+  color: #3730a3;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.alunos-nome {
+  color: #111827;
+  font-weight: 600;
+}
+
+.alunos-email {
+  margin-top: 0.1rem;
+  color: #6b7280;
+  font-size: 0.82rem;
+}
+
+.alunos-aviso {
+  padding: 3rem 1rem;
+  text-align: center;
+  color: #6b7280;
+}
+
+/* Selo de situação, com uma bolinha antes do texto */
+.alunos-selo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.alunos-selo::before {
+  content: '';
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.alunos-selo-ativo {
+  background: #dcfce7;
+  color: #166534;
+}
+
+/* Faixa no rodapé do cartão: resumo e seletor à esquerda, números de página à direita */
+.alunos-rodape {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+.alunos-rodape-esquerda {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.alunos-tamanho {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.alunos-tamanho select {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #374151;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.alunos-tamanho select:focus-visible {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+/* Telas estreitas: a tabela rola na horizontal em vez de quebrar */
+@media (max-width: 640px) {
+  .alunos-cartao {
+    overflow-x: auto;
+  }
+
+  .alunos-tabela {
+    min-width: 560px;
+  }
+}

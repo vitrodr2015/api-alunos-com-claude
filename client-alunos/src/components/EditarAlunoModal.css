@@ -88,6 +88,23 @@
   background: #b91c1c;
 }
 
+/* Campo com valor inválido: borda vermelha e a mensagem logo abaixo */
+.editar-campo .editar-input-invalido,
+.editar-campo .editar-input-invalido:focus {
+  border-color: #dc2626;
+}
+
+.editar-campo .editar-input-invalido:focus {
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
+}
+
+.editar-campo-erro {
+  display: block;
+  margin-top: 0.35rem;
+  color: #b91c1c;
+  font-size: 0.8rem;
+}
+
 .editar-erro {
   margin: 0 0 1.1rem;
   padding: 0.7rem 0.85rem;

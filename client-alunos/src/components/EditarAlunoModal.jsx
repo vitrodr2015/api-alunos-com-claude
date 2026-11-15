@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { alterarSituacao, atualizarAluno } from '../api/alunos'
 import { ontem } from '../utils/datas'
+import { emailValido } from '../utils/validacoes'
+import CampoEmail from './CampoEmail'
 import './EditarAlunoModal.css'
 
 // Popup para editar um aluno. Usa o elemento nativo <dialog>, que já traz o fundo escurecido,
@@ -15,6 +17,7 @@ function EditarAlunoModal({ aluno, onSalvo, onCancelar, onRecarregar, onSessaoEx
   const [email, setEmail] = useState(aluno.email)
   const [dataNascimento, setDataNascimento] = useState(aluno.dataNascimento)
   const [ativo, setAtivo] = useState(aluno.ativo)
+  const [emailTocado, setEmailTocado] = useState(false) // true depois de sair do campo ou de tentar enviar
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
 
@@ -29,6 +32,8 @@ function EditarAlunoModal({ aluno, onSalvo, onCancelar, onRecarregar, onSessaoEx
     nome.trim() !== original.nome || email.trim() !== original.email || dataNascimento !== original.dataNascimento
   const situacaoAlterada = ativo !== original.ativo
 
+  const emailOk = emailValido(email)
+
   function cancelar() {
     if (!salvando) onCancelar() // não deixa fechar no meio de um salvamento
   }
@@ -37,6 +42,10 @@ function EditarAlunoModal({ aluno, onSalvo, onCancelar, onRecarregar, onSessaoEx
   // Então gravamos em até duas chamadas, uma depois da outra.
   async function aoEnviar(evento) {
     evento.preventDefault()
+    if (!emailOk) {
+      setEmailTocado(true) // mostra a mensagem e não envia
+      return
+    }
     setErro('')
     setSalvando(true)
     let gravouAlgo = false
@@ -97,16 +106,13 @@ function EditarAlunoModal({ aluno, onSalvo, onCancelar, onRecarregar, onSessaoEx
           />
         </div>
 
-        <div className="editar-campo">
-          <label htmlFor="editar-email">E-mail</label>
-          <input
-            id="editar-email"
-            type="email"
-            value={email}
-            onChange={(evento) => setEmail(evento.target.value)}
-            required
-          />
-        </div>
+        <CampoEmail
+          id="editar-email"
+          valor={email}
+          onChange={setEmail}
+          onBlur={() => setEmailTocado(true)}
+          mostrarErro={emailTocado && email.trim() !== '' && !emailOk}
+        />
 
         <div className="editar-campo">
           <label htmlFor="editar-nascimento">Data de nascimento</label>

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { criarAluno } from '../api/alunos'
 import { ontem } from '../utils/datas'
+import { emailValido } from '../utils/validacoes'
+import CampoEmail from './CampoEmail'
 import './EditarAlunoModal.css' // usa o mesmo visual de popup do editar (editar-dialogo, editar-campo...)
 
 // Popup para cadastrar um aluno novo (<dialog> nativo, como os outros).
@@ -10,6 +12,7 @@ function NovoAlunoModal({ onCriado, onCancelar, onSessaoExpirada }) {
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
   const [dataNascimento, setDataNascimento] = useState('')
+  const [emailTocado, setEmailTocado] = useState(false) // true depois de sair do campo ou de tentar enviar
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
 
@@ -19,12 +22,18 @@ function NovoAlunoModal({ onCriado, onCancelar, onSessaoExpirada }) {
     return () => dialogo.close()
   }, [])
 
+  const emailOk = emailValido(email)
+
   function cancelar() {
     if (!salvando) onCancelar()
   }
 
   async function aoEnviar(evento) {
     evento.preventDefault()
+    if (!emailOk) {
+      setEmailTocado(true) // mostra a mensagem e não envia
+      return
+    }
     setErro('')
     setSalvando(true)
     try {
@@ -70,16 +79,13 @@ function NovoAlunoModal({ onCriado, onCancelar, onSessaoExpirada }) {
           />
         </div>
 
-        <div className="editar-campo">
-          <label htmlFor="novo-email">E-mail</label>
-          <input
-            id="novo-email"
-            type="email"
-            value={email}
-            onChange={(evento) => setEmail(evento.target.value)}
-            required
-          />
-        </div>
+        <CampoEmail
+          id="novo-email"
+          valor={email}
+          onChange={setEmail}
+          onBlur={() => setEmailTocado(true)}
+          mostrarErro={emailTocado && email.trim() !== '' && !emailOk}
+        />
 
         <div className="editar-campo">
           <label htmlFor="novo-nascimento">Data de nascimento</label>

@@ -341,9 +341,67 @@
   font-weight: 700;
 }
 
+/* o nome é um link para a página de detalhe do aluno */
 .alunos-nome {
+  display: block;
   color: #111827;
   font-weight: 600;
+  text-decoration: none;
+}
+
+.alunos-nome:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+/* Situação: interruptor (liga/desliga) ao lado do selo */
+.alunos-situacao-celula {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.alunos-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 1.3rem;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: #d1d5db;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.alunos-switch-ligado {
+  background: #22c55e;
+}
+
+.alunos-switch:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.alunos-switch:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
+}
+
+.alunos-switch-bolinha {
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.3);
+  transition: transform 0.15s;
+}
+
+.alunos-switch-ligado .alunos-switch-bolinha {
+  transform: translateX(0.95rem);
 }
 
 .alunos-email {

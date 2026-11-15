@@ -50,6 +50,141 @@
   font-size: 0.875rem;
 }
 
+/* Linha de filtros: busca (ocupa o espaço que sobra), situação e "limpar filtros" */
+.alunos-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+/* Situação: três botões colados, o selecionado fica azul */
+.alunos-situacao {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.alunos-situacao button {
+  padding: 0.65rem 1rem;
+  border: none;
+  border-right: 1px solid #e5e7eb;
+  background: transparent;
+  color: #374151;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.alunos-situacao button:last-child {
+  border-right: none;
+}
+
+.alunos-situacao button:hover:not(.alunos-situacao-ativa) {
+  background: #f3f4f6;
+}
+
+.alunos-situacao .alunos-situacao-ativa {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.alunos-limpar-filtros {
+  padding: 0.65rem 0.5rem;
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.alunos-limpar-filtros:hover {
+  text-decoration: underline;
+}
+
+/* Cabeçalho de coluna clicável (ordenação) */
+.alunos-ordenar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.alunos-ordenar:hover {
+  color: #111827;
+}
+
+.alunos-seta {
+  font-size: 0.7rem;
+  color: #d1d5db;
+}
+
+.alunos-seta-ativa {
+  color: #2563eb;
+}
+
+/* Campo de busca com o botão × para limpar */
+.alunos-busca {
+  position: relative;
+  flex: 1 1 14rem;
+}
+
+.alunos-busca input {
+  width: 100%;
+  padding: 0.7rem 2.5rem 0.7rem 0.95rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #111827;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  /* esconde o × que o próprio navegador desenha em type="search", para usar o nosso */
+  appearance: none;
+}
+
+.alunos-busca input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.alunos-busca input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.alunos-busca-limpar {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  transform: translateY(-50%);
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #6b7280;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.alunos-busca-limpar:hover {
+  background: #f3f4f6;
+}
+
 /* Cartão que envolve a tabela e a paginação */
 .alunos-cartao {
   overflow: hidden;

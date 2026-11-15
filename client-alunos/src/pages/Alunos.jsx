@@ -5,6 +5,14 @@ import './Alunos.css'
 
 const TAMANHOS_PAGINA = [10, 20, 50] // 50 é o máximo que a API aceita (acima disso ela reduz para 50)
 
+const SITUACOES = [
+  { valor: 'todos', rotulo: 'Todos' },
+  { valor: 'ativos', rotulo: 'Ativos' },
+  { valor: 'inativos', rotulo: 'Inativos' },
+]
+
+const ORDEM_PADRAO = { campo: 'id', direcao: 'asc' }
+
 // "01/12/2000" a partir de "2000-12-01". Não usamos new Date() de propósito: ele converteria
 // o texto para UTC e, em fusos como o do Brasil, mostraria o dia anterior.
 function formatarData(iso) {
@@ -20,15 +28,45 @@ function iniciais(nome) {
   return (primeira + ultima).toUpperCase()
 }
 
+// Cabeçalho de coluna clicável: mostra ▲ ou ▼ na coluna que está ordenando a tabela.
+function CabecalhoOrdenavel({ campo, ordem, onOrdenar, className, children }) {
+  const ativo = ordem.campo === campo
+  const aria = ativo ? (ordem.direcao === 'asc' ? 'ascending' : 'descending') : 'none'
+  return (
+    <th className={className} aria-sort={aria}>
+      <button className="alunos-ordenar" onClick={() => onOrdenar(campo)}>
+        {children}
+        <span className={ativo ? 'alunos-seta alunos-seta-ativa' : 'alunos-seta'} aria-hidden="true">
+          {ativo ? (ordem.direcao === 'asc' ? '▲' : '▼') : '↕'}
+        </span>
+      </button>
+    </th>
+  )
+}
+
 function Alunos({ onSair }) {
   const [pagina, setPagina] = useState(0) // número da página atual (começa em 0, como na API)
   const [tamanho, setTamanho] = useState(10) // alunos por página
+  const [busca, setBusca] = useState('') // o que está digitado no campo (muda a cada tecla)
+  const [nome, setNome] = useState('') // o termo realmente usado na busca (só muda depois de uma pausa na digitação)
+  const [situacao, setSituacao] = useState('todos') // 'todos' | 'ativos' | 'inativos'
+  const [ordem, setOrdem] = useState(ORDEM_PADRAO) // { campo, direcao }
   const [alunos, setAlunos] = useState([])
   const [info, setInfo] = useState(null) // { totalElements, totalPages, ... }
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
 
-  // useEffect roda depois de a tela ser desenhada, e de novo sempre que algo da lista [pagina] mudar.
+  // Debounce: espera 400 ms sem digitar antes de buscar. Sem isso, cada tecla dispararia uma chamada à API.
+  // O return limpa o temporizador anterior; se o usuário digitar de novo antes dos 400 ms, a contagem recomeça.
+  useEffect(() => {
+    const temporizador = setTimeout(() => {
+      setNome(busca.trim())
+      setPagina(0) // um novo filtro sempre começa na primeira página
+    }, 400)
+    return () => clearTimeout(temporizador)
+  }, [busca])
+
+  // useEffect roda depois de a tela ser desenhada, e de novo sempre que algo da lista de dependências mudar.
   useEffect(() => {
     let cancelado = false // evita gravar o resultado de uma chamada antiga se o usuário já trocou de página
 
@@ -36,7 +74,14 @@ function Alunos({ onSair }) {
       setCarregando(true)
       setErro('')
       try {
-        const resultado = await listarAlunos({ page: pagina, size: tamanho })
+        const resultado = await listarAlunos({
+          page: pagina,
+          size: tamanho,
+          nome,
+          situacao,
+          campoOrdem: ordem.campo,
+          direcaoOrdem: ordem.direcao,
+        })
         if (cancelado) return
         setAlunos(resultado.alunos)
         setInfo(resultado.pagina)
@@ -56,7 +101,7 @@ function Alunos({ onSair }) {
     return () => {
       cancelado = true
     }
-  }, [pagina, tamanho, onSair])
+  }, [pagina, tamanho, nome, situacao, ordem, onSair])
 
   const totalPaginas = info?.totalPages ?? 0
 
@@ -66,16 +111,54 @@ function Alunos({ onSair }) {
     setPagina(0)
   }
 
+  function mudarSituacao(novaSituacao) {
+    setSituacao(novaSituacao)
+    setPagina(0)
+  }
+
+  // Clicar numa coluna: se já é a coluna da ordenação, inverte o sentido; se é outra, começa em A→Z (crescente).
+  function ordenarPor(campo) {
+    setOrdem((atual) =>
+      atual.campo === campo
+        ? { campo, direcao: atual.direcao === 'asc' ? 'desc' : 'asc' }
+        : { campo, direcao: 'asc' },
+    )
+    setPagina(0)
+  }
+
+  const ordemPadrao = ordem.campo === ORDEM_PADRAO.campo && ordem.direcao === ORDEM_PADRAO.direcao
+  const temFiltro = busca !== '' || situacao !== 'todos' || !ordemPadrao
+
+  function limparFiltros() {
+    setBusca('')
+    setNome('') // sem esperar o debounce de 400 ms
+    setSituacao('todos')
+    setOrdem(ORDEM_PADRAO)
+    setPagina(0)
+  }
+
   // "Mostrando 11–20 de 404"
   const primeiro = info && info.totalElements > 0 ? pagina * tamanho + 1 : 0
   const ultimo = info ? Math.min((pagina + 1) * tamanho, info.totalElements) : 0
+
+  // Texto do subtítulo: "404 alunos cadastrados" ou, com filtro, "61 resultados para “ana” · ativos"
+  let subtitulo = ''
+  if (info) {
+    if (nome || situacao !== 'todos') {
+      subtitulo = `${info.totalElements} ${info.totalElements === 1 ? 'resultado' : 'resultados'}`
+      if (nome) subtitulo += ` para “${nome}”`
+      if (situacao !== 'todos') subtitulo += ` · ${situacao}`
+    } else {
+      subtitulo = `${info.totalElements} alunos cadastrados`
+    }
+  }
 
   return (
     <div className="alunos-pagina">
       <header className="alunos-cabecalho">
         <div>
           <h1>Alunos</h1>
-          {info && <p className="alunos-subtitulo">{info.totalElements} alunos cadastrados</p>}
+          {info && <p className="alunos-subtitulo">{subtitulo}</p>}
         </div>
         <button className="alunos-botao-sair" onClick={onSair}>
           Sair
@@ -88,14 +171,56 @@ function Alunos({ onSair }) {
         </p>
       )}
 
+      <div className="alunos-filtros">
+        <div className="alunos-busca">
+          <input
+            type="search"
+            value={busca}
+            onChange={(evento) => setBusca(evento.target.value)}
+            placeholder="Buscar aluno por nome"
+            aria-label="Buscar aluno por nome"
+          />
+          {busca && (
+            <button className="alunos-busca-limpar" onClick={() => setBusca('')} aria-label="Limpar busca">
+              ×
+            </button>
+          )}
+        </div>
+
+        <div className="alunos-situacao" role="group" aria-label="Filtrar por situação">
+          {SITUACOES.map((s) => (
+            <button
+              key={s.valor}
+              className={situacao === s.valor ? 'alunos-situacao-ativa' : ''}
+              onClick={() => mudarSituacao(s.valor)}
+              aria-pressed={situacao === s.valor}
+            >
+              {s.rotulo}
+            </button>
+          ))}
+        </div>
+
+        {temFiltro && (
+          <button className="alunos-limpar-filtros" onClick={limparFiltros}>
+            Limpar filtros
+          </button>
+        )}
+      </div>
+
       <div className="alunos-cartao">
         {/* durante o carregamento de uma nova página, a tabela fica levemente apagada em vez de sumir */}
         <table className={carregando ? 'alunos-tabela alunos-tabela-carregando' : 'alunos-tabela'}>
           <thead>
             <tr>
-              <th className="alunos-col-id">ID</th>
-              <th>Aluno</th>
-              <th>Nascimento</th>
+              <CabecalhoOrdenavel campo="id" ordem={ordem} onOrdenar={ordenarPor} className="alunos-col-id">
+                ID
+              </CabecalhoOrdenavel>
+              <CabecalhoOrdenavel campo="nome" ordem={ordem} onOrdenar={ordenarPor}>
+                Aluno
+              </CabecalhoOrdenavel>
+              <CabecalhoOrdenavel campo="dataNascimento" ordem={ordem} onOrdenar={ordenarPor}>
+                Nascimento
+              </CabecalhoOrdenavel>
               <th>Situação</th>
             </tr>
           </thead>
@@ -111,7 +236,7 @@ function Alunos({ onSair }) {
             {!carregando && alunos.length === 0 && !erro && (
               <tr>
                 <td colSpan="4" className="alunos-aviso">
-                  Nenhum aluno encontrado.
+                  {nome ? `Nenhum aluno encontrado para “${nome}”.` : 'Nenhum aluno encontrado.'}
                 </td>
               </tr>
             )}

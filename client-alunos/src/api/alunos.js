@@ -8,9 +8,24 @@ export class ErroApi extends Error {
   }
 }
 
-export async function listarAlunos({ page = 0, size = 10 } = {}) {
+// situacao: 'todos' | 'ativos' | 'inativos'  ->  ?ativo=true / ?ativo=false (sem o parâmetro = todos)
+// campoOrdem: 'id' | 'nome' | 'dataNascimento' (nomes dos campos do aluno);  direcaoOrdem: 'asc' | 'desc'
+export async function listarAlunos({
+  page = 0,
+  size = 10,
+  nome = '',
+  situacao = 'todos',
+  campoOrdem = 'id',
+  direcaoOrdem = 'asc',
+} = {}) {
   const token = localStorage.getItem('accessToken')
-  const resposta = await fetch(`/api/alunos?page=${page}&size=${size}`, {
+
+  // URLSearchParams monta a query string e já escapa caracteres especiais (acentos, espaços, &...)
+  const parametros = new URLSearchParams({ page, size, sort: `${campoOrdem},${direcaoOrdem}` })
+  if (nome) parametros.set('nome', nome) // a API filtra por "nome contém o texto", sem diferenciar maiúsculas
+  if (situacao !== 'todos') parametros.set('ativo', situacao === 'ativos')
+
+  const resposta = await fetch(`/api/alunos?${parametros}`, {
     headers: { Authorization: `Bearer ${token}` },
   })
 

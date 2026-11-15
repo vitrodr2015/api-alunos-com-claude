@@ -11,10 +11,11 @@ import br.com.vitor.apicrud_alunos.model.Aluno;
 
 public interface AlunoRepository extends JpaRepository<Aluno, Long> {
 
-	// nome: "contém", sem diferenciar maiúsculas de minúsculas (o Spring Data escapa % e _ digitados)
-	Page<Aluno> findByNomeContainingIgnoreCase(String nome, Pageable pageable);
+	// nome: "começa com", sem diferenciar maiúsculas de minúsculas (o Spring Data escapa % e _ digitados).
+	// "ana" acha Ana Souza, mas não Mariana nem Tatiana; texto vazio acha todos.
+	Page<Aluno> findByNomeStartingWithIgnoreCase(String nome, Pageable pageable);
 
-	Page<Aluno> findByNomeContainingIgnoreCaseAndAtivo(String nome, boolean ativo, Pageable pageable);
+	Page<Aluno> findByNomeStartingWithIgnoreCaseAndAtivo(String nome, boolean ativo, Pageable pageable);
 
 	boolean existsByEmailIgnoreCase(String email);
 

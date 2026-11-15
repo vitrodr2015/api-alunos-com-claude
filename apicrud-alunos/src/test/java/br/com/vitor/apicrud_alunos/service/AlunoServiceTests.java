@@ -228,11 +228,11 @@ class AlunoServiceTests {
 
 	@Test
 	void listarAceitaOrdenarPorCadaCampoDoAluno() {
-		when(repository.findByNomeContainingIgnoreCase(anyString(), any(Pageable.class))).thenReturn(Page.empty());
+		when(repository.findByNomeStartingWithIgnoreCase(anyString(), any(Pageable.class))).thenReturn(Page.empty());
 		for (String campo : new String[] { "id", "nome", "email", "dataNascimento", "ativo" }) {
 			service.listar(null, null, PageRequest.of(0, 20, Sort.by(campo)));
 		}
-		verify(repository, org.mockito.Mockito.times(5)).findByNomeContainingIgnoreCase(anyString(), any(Pageable.class));
+		verify(repository, org.mockito.Mockito.times(5)).findByNomeStartingWithIgnoreCase(anyString(), any(Pageable.class));
 	}
 
 	// ---------- listar ----------
@@ -240,13 +240,13 @@ class AlunoServiceTests {
 	@Test
 	void listarSemAtivoUsaOFiltroSoPorNomeEPassaPaginaEOrdenacaoComDesempatePeloId() {
 		Page<Aluno> pagina = new PageImpl<>(List.of(aluno(1L, "Ana", "a@x.com")), PageRequest.of(1, 5), 11);
-		when(repository.findByNomeContainingIgnoreCase(eq("souza"), any(Pageable.class))).thenReturn(pagina);
+		when(repository.findByNomeStartingWithIgnoreCase(eq("souza"), any(Pageable.class))).thenReturn(pagina);
 
 		Page<Aluno> resposta = service.listar("  souza ", null, PageRequest.of(1, 5, Sort.by(Sort.Direction.DESC, "nome")));
 
 		ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-		verify(repository).findByNomeContainingIgnoreCase(eq("souza"), pageable.capture());
-		verify(repository, never()).findByNomeContainingIgnoreCaseAndAtivo(any(), anyBoolean(), any());
+		verify(repository).findByNomeStartingWithIgnoreCase(eq("souza"), pageable.capture());
+		verify(repository, never()).findByNomeStartingWithIgnoreCaseAndAtivo(any(), anyBoolean(), any());
 		assertThat(pageable.getValue().getPageNumber()).isEqualTo(1);
 		assertThat(pageable.getValue().getPageSize()).isEqualTo(5);
 		List<Sort.Order> ordens = pageable.getValue().getSort().toList();
@@ -262,35 +262,35 @@ class AlunoServiceTests {
 
 	@Test
 	void listarComAtivoUsaOFiltroPorNomeEAtivo() {
-		when(repository.findByNomeContainingIgnoreCaseAndAtivo(eq(""), eq(false), any(Pageable.class)))
+		when(repository.findByNomeStartingWithIgnoreCaseAndAtivo(eq(""), eq(false), any(Pageable.class)))
 				.thenReturn(Page.empty());
 
 		Page<Aluno> resposta = service.listar(null, false, PageRequest.of(0, 20));
 
 		assertThat(resposta.getContent()).isEmpty();
-		verify(repository, never()).findByNomeContainingIgnoreCase(any(), any());
+		verify(repository, never()).findByNomeStartingWithIgnoreCase(any(), any());
 	}
 
 	@Test
 	void listarSemOrdenacaoOrdenaPeloId() {
-		when(repository.findByNomeContainingIgnoreCase(eq(""), any(Pageable.class))).thenReturn(Page.empty());
+		when(repository.findByNomeStartingWithIgnoreCase(eq(""), any(Pageable.class))).thenReturn(Page.empty());
 
 		service.listar(null, null, PageRequest.of(0, 20));
 
 		ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-		verify(repository).findByNomeContainingIgnoreCase(eq(""), pageable.capture());
+		verify(repository).findByNomeStartingWithIgnoreCase(eq(""), pageable.capture());
 		assertThat(pageable.getValue().getSort().toList()).hasSize(1);
 		assertThat(pageable.getValue().getSort().getOrderFor("id")).isNotNull();
 	}
 
 	@Test
 	void listarOrdenandoPeloIdNaoDuplicaOId() {
-		when(repository.findByNomeContainingIgnoreCase(eq(""), any(Pageable.class))).thenReturn(Page.empty());
+		when(repository.findByNomeStartingWithIgnoreCase(eq(""), any(Pageable.class))).thenReturn(Page.empty());
 
 		service.listar(null, null, PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "id")));
 
 		ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-		verify(repository).findByNomeContainingIgnoreCase(eq(""), pageable.capture());
+		verify(repository).findByNomeStartingWithIgnoreCase(eq(""), pageable.capture());
 		List<Sort.Order> ordens = pageable.getValue().getSort().toList();
 		assertThat(ordens).hasSize(1);
 		assertThat(ordens.get(0).getDirection()).isEqualTo(Sort.Direction.DESC);

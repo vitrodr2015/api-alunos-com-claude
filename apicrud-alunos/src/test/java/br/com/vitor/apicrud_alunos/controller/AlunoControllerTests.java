@@ -56,7 +56,8 @@ class AlunoControllerTests {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.nome").value("Helena Barros"))
 				.andExpect(jsonPath("$.email").value("helena.barros@escola.com"));
-		mockMvc.perform(get("/alunos").param("nome", "souza"))
+		// a busca é "começa com": "ana" acha Ana Souza (id 1)
+		mockMvc.perform(get("/alunos").param("nome", "ana"))
 				.andExpect(jsonPath("$._embedded.alunos[0].id").value(1));
 	}
 

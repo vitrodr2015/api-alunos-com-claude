@@ -49,7 +49,7 @@ public class OpenApiConfig {
 			### Paginação e ordenação
 			`GET /alunos?page=0&size=20&sort=nome,asc`. O tamanho padrão é 20 e o máximo é 50 (valores maiores são reduzidos). \
 			Os campos de ordenação aceitos são os do aluno (`id`, `nome`, `email`, `dataNascimento`, `ativo`); outro campo dá **400**. \
-			Filtros: `nome` (contém, sem diferenciar maiúsculas) e `ativo` (`true` ou `false`).""";
+			Filtros: `nome` (começa com, sem diferenciar maiúsculas) e `ativo` (`true` ou `false`).""";
 
 	@Bean
 	public OpenAPI apiAlunos() {

@@ -8,6 +8,23 @@ export class ErroApi extends Error {
   }
 }
 
+// Cadastra um aluno novo (a API o cria sempre como ativo). dataNascimento no formato "aaaa-mm-dd".
+// Erros: 400 (campos inválidos, com a lista na mensagem) e 409 (e-mail já cadastrado).
+export async function criarAluno({ nome, email, dataNascimento }) {
+  const token = localStorage.getItem('accessToken')
+  const resposta = await fetch('/api/alunos', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nome, email, dataNascimento }),
+  })
+
+  if (!resposta.ok) {
+    const erro = await resposta.json().catch(() => null)
+    throw new ErroApi(erro?.mensagem ?? 'Não foi possível cadastrar o aluno.', resposta.status)
+  }
+  return resposta.json() // o aluno criado, já com o id
+}
+
 // Altera nome, e-mail e data de nascimento (dataNascimento no formato "aaaa-mm-dd").
 // A API valida e responde 400 (campos inválidos, com a lista na mensagem) ou 409 (e-mail já usado).
 export async function atualizarAluno(id, { nome, email, dataNascimento }) {

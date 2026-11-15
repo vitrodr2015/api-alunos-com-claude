@@ -1,13 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { alterarSituacao, atualizarAluno } from '../api/alunos'
+import { ontem } from '../utils/datas'
 import './EditarAlunoModal.css'
-
-// A data de nascimento precisa ser no passado: o máximo do campo é ontem (no fuso local, "aaaa-mm-dd").
-function ontem() {
-  const data = new Date()
-  data.setDate(data.getDate() - 1)
-  return data.toLocaleDateString('sv-SE')
-}
 
 // Popup para editar um aluno. Usa o elemento nativo <dialog>, que já traz o fundo escurecido,
 // prende o foco dentro do popup e fecha com a tecla Esc.

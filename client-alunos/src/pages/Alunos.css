@@ -24,6 +24,36 @@
   color: #6b7280;
 }
 
+.alunos-cabecalho-acoes {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.alunos-botao-novo {
+  padding: 0.5rem 1.1rem;
+  border: 1px solid #2563eb;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.alunos-botao-novo:hover {
+  background: #1d4ed8;
+}
+
+.alunos-sucesso {
+  margin: 0 0 1rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 0.875rem;
+}
+
 .alunos-botao-sair {
   padding: 0.5rem 1.1rem;
   border: 1px solid #d1d5db;

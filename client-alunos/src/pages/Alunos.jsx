@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { listarAlunos } from '../api/alunos'
 import EditarAlunoModal from '../components/EditarAlunoModal'
 import ExcluirAlunoModal from '../components/ExcluirAlunoModal'
+import NovoAlunoModal from '../components/NovoAlunoModal'
 import Paginacao from '../components/Paginacao'
 import './Alunos.css'
 
@@ -55,11 +56,20 @@ function Alunos({ onSair }) {
   const [ordem, setOrdem] = useState(ORDEM_PADRAO) // { campo, direcao }
   const [alunoEditando, setAlunoEditando] = useState(null) // o aluno cujo popup está aberto (null = fechado)
   const [alunoExcluindo, setAlunoExcluindo] = useState(null) // o aluno cuja confirmação de exclusão está aberta
+  const [cadastrando, setCadastrando] = useState(false) // popup de novo aluno aberto?
+  const [mensagem, setMensagem] = useState('') // aviso de sucesso (ex.: "Aluno cadastrado"), some sozinho
   const [versao, setVersao] = useState(0) // soma 1 para forçar o recarregamento da lista (ex.: depois de editar)
   const [alunos, setAlunos] = useState([])
   const [info, setInfo] = useState(null) // { totalElements, totalPages, ... }
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
+
+  // O aviso de sucesso desaparece depois de 5 segundos
+  useEffect(() => {
+    if (!mensagem) return
+    const temporizador = setTimeout(() => setMensagem(''), 5000)
+    return () => clearTimeout(temporizador)
+  }, [mensagem])
 
   // Debounce: espera 400 ms sem digitar antes de buscar. Sem isso, cada tecla dispararia uma chamada à API.
   // O return limpa o temporizador anterior; se o usuário digitar de novo antes dos 400 ms, a contagem recomeça.
@@ -165,10 +175,21 @@ function Alunos({ onSair }) {
           <h1>Alunos</h1>
           {info && <p className="alunos-subtitulo">{subtitulo}</p>}
         </div>
-        <button className="alunos-botao-sair" onClick={onSair}>
-          Sair
-        </button>
+        <div className="alunos-cabecalho-acoes">
+          <button className="alunos-botao-novo" onClick={() => setCadastrando(true)}>
+            + Novo aluno
+          </button>
+          <button className="alunos-botao-sair" onClick={onSair}>
+            Sair
+          </button>
+        </div>
       </header>
+
+      {mensagem && (
+        <p className="alunos-sucesso" role="status">
+          {mensagem}
+        </p>
+      )}
 
       {erro && (
         <p className="alunos-erro" role="alert">
@@ -322,6 +343,18 @@ function Alunos({ onSair }) {
             setVersao((v) => v + 1) // recarrega a página atual para mostrar os dados alterados
           }}
           onRecarregar={() => setVersao((v) => v + 1)}
+          onSessaoExpirada={onSair}
+        />
+      )}
+
+      {cadastrando && (
+        <NovoAlunoModal
+          onCancelar={() => setCadastrando(false)}
+          onCriado={(criado) => {
+            setCadastrando(false)
+            setMensagem(`Aluno “${criado.nome}” cadastrado com sucesso (#${criado.id}).`)
+            setVersao((v) => v + 1) // recarrega a lista; o aluno novo tem o maior id (última página na ordem padrão)
+          }}
           onSessaoExpirada={onSair}
         />
       )}

@@ -1,0 +1,46 @@
+.paginacao {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.paginacao button {
+  min-width: 2.1rem;
+  height: 2.1rem;
+  padding: 0 0.6rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #374151;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.paginacao button:hover:not(:disabled):not(.paginacao-atual) {
+  background: #f3f4f6;
+}
+
+.paginacao-atual {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  cursor: default !important;
+}
+
+.paginacao-seta {
+  border-color: #d1d5db !important;
+  background: #ffffff !important;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.paginacao button:disabled:not(.paginacao-atual) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.paginacao-buraco {
+  min-width: 1.5rem;
+  text-align: center;
+  color: #9ca3af;
+}

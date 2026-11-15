@@ -4,3 +4,19 @@ services:
     image: vitrodr/crud-alunos
     ports:
       - "8080:8080"
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+  mysql:
+    image: mysql:8
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: crud_alunos
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:

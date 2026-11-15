@@ -1,6 +1,9 @@
 spring:
   application:
     name: apicrud-alunos
+  # os testes NAO usam Redis (o cache real é testado no CacheRedisIntegrationTests); sem isso a suite dependeria de um Redis local
+  cache:
+    type: none
   # Os testes usam H2 e as migrations são específicas do MySQL
   flyway:
     enabled: false
@@ -20,6 +23,10 @@ spring:
       pageable:
         default-page-size: 20
         max-page-size: 50
+    redis:
+      # igual ao application.yml principal (o de teste o substitui): sem isso o Redis fora do ar faria cada chamada esperar 60 s
+      timeout: 2s
+      connect-timeout: 2s
 
 # Valores só para os testes. O segredo abaixo é FALSO de propósito (não protege nada e não é o de nenhum ambiente);
 # o arquivo de teste substitui o principal, então a configuração do JWT precisa estar aqui também.
@@ -46,3 +53,7 @@ management:
         enabled: true
       show-details: never
       show-components: never
+  # O Redis e so cache (otimizacao): se ele cair a API continua UP; por isso fora do health
+  health:
+    redis:
+      enabled: false

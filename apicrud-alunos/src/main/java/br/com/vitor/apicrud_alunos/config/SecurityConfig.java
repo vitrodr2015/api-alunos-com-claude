@@ -1,6 +1,7 @@
 package br.com.vitor.apicrud_alunos.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -26,6 +27,7 @@ import br.com.vitor.apicrud_alunos.security.RestAuthenticationEntryPoint;
 import br.com.vitor.apicrud_alunos.security.SecurityErrorWriter;
 
 @Configuration
+@EnableCaching 
 @EnableWebSecurity
 public class SecurityConfig {
 

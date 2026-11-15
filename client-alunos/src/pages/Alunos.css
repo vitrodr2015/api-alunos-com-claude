@@ -247,8 +247,30 @@
 
 /* Coluna de ações (botão Editar em cada linha) */
 .alunos-tabela .alunos-col-acoes {
-  width: 6rem;
+  width: 11rem;
   text-align: right;
+  white-space: nowrap;
+}
+
+.alunos-col-acoes button + button {
+  margin-left: 0.4rem;
+}
+
+.alunos-botao-excluir {
+  padding: 0.4rem 0.85rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #dc2626;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.alunos-botao-excluir:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
 }
 
 .alunos-botao-editar {
@@ -381,6 +403,6 @@
   }
 
   .alunos-tabela {
-    min-width: 560px;
+    min-width: 680px;
   }
 }

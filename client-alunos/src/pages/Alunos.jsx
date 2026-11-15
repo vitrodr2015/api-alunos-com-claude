@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { listarAlunos } from '../api/alunos'
 import EditarAlunoModal from '../components/EditarAlunoModal'
+import ExcluirAlunoModal from '../components/ExcluirAlunoModal'
 import Paginacao from '../components/Paginacao'
 import './Alunos.css'
 
@@ -53,6 +54,7 @@ function Alunos({ onSair }) {
   const [situacao, setSituacao] = useState('todos') // 'todos' | 'ativos' | 'inativos'
   const [ordem, setOrdem] = useState(ORDEM_PADRAO) // { campo, direcao }
   const [alunoEditando, setAlunoEditando] = useState(null) // o aluno cujo popup está aberto (null = fechado)
+  const [alunoExcluindo, setAlunoExcluindo] = useState(null) // o aluno cuja confirmação de exclusão está aberta
   const [versao, setVersao] = useState(0) // soma 1 para forçar o recarregamento da lista (ex.: depois de editar)
   const [alunos, setAlunos] = useState([])
   const [info, setInfo] = useState(null) // { totalElements, totalPages, ... }
@@ -274,6 +276,13 @@ function Alunos({ onSair }) {
                   >
                     Editar
                   </button>
+                  <button
+                    className="alunos-botao-excluir"
+                    onClick={() => setAlunoExcluindo(aluno)}
+                    aria-label={`Excluir ${aluno.nome}`}
+                  >
+                    Excluir
+                  </button>
                 </td>
               </tr>
             ))}
@@ -311,6 +320,23 @@ function Alunos({ onSair }) {
           onSalvo={() => {
             setAlunoEditando(null)
             setVersao((v) => v + 1) // recarrega a página atual para mostrar os dados alterados
+          }}
+          onRecarregar={() => setVersao((v) => v + 1)}
+          onSessaoExpirada={onSair}
+        />
+      )}
+
+      {alunoExcluindo && (
+        <ExcluirAlunoModal
+          key={alunoExcluindo.id}
+          aluno={alunoExcluindo}
+          onCancelar={() => setAlunoExcluindo(null)}
+          onExcluido={() => {
+            setAlunoExcluindo(null)
+            // Se era o único aluno da última página, essa página deixa de existir: volta uma página.
+            // Senão, só recarrega a página atual.
+            if (alunos.length === 1 && pagina > 0) setPagina(pagina - 1)
+            else setVersao((v) => v + 1)
           }}
           onSessaoExpirada={onSair}
         />

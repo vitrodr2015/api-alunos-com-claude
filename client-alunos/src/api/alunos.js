@@ -25,6 +25,36 @@ export async function atualizarAluno(id, { nome, email, dataNascimento }) {
   return resposta.json()
 }
 
+// Ativa ou desativa o aluno (rotas separadas do PUT): PATCH /alunos/{id}/enable ou /disable
+export async function alterarSituacao(id, ativo) {
+  const token = localStorage.getItem('accessToken')
+  const resposta = await fetch(`/api/alunos/${id}/${ativo ? 'enable' : 'disable'}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+
+  if (!resposta.ok) {
+    const erro = await resposta.json().catch(() => null)
+    throw new ErroApi(erro?.mensagem ?? 'Não foi possível alterar a situação do aluno.', resposta.status)
+  }
+  return resposta.json()
+}
+
+// Remove o aluno de vez (irreversível). Só quem tem perfil ADMIN pode: os demais recebem 403.
+// A API responde 204 sem corpo, por isso não há resposta.json() aqui.
+export async function excluirAluno(id) {
+  const token = localStorage.getItem('accessToken')
+  const resposta = await fetch(`/api/alunos/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+
+  if (!resposta.ok) {
+    const erro = await resposta.json().catch(() => null)
+    throw new ErroApi(erro?.mensagem ?? 'Não foi possível excluir o aluno.', resposta.status)
+  }
+}
+
 // situacao: 'todos' | 'ativos' | 'inativos'  ->  ?ativo=true / ?ativo=false (sem o parâmetro = todos)
 // campoOrdem: 'id' | 'nome' | 'dataNascimento' (nomes dos campos do aluno);  direcaoOrdem: 'asc' | 'desc'
 export async function listarAlunos({

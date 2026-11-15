@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { atualizarAluno } from '../api/alunos'
+import { alterarSituacao, atualizarAluno } from '../api/alunos'
 import './EditarAlunoModal.css'
 
 // A data de nascimento precisa ser no passado: o máximo do campo é ontem (no fuso local, "aaaa-mm-dd").
@@ -12,11 +12,15 @@ function ontem() {
 // Popup para editar um aluno. Usa o elemento nativo <dialog>, que já traz o fundo escurecido,
 // prende o foco dentro do popup e fecha com a tecla Esc.
 //   aluno: o aluno sendo editado;  onSalvo: chamado depois de gravar;  onCancelar: chamado ao fechar sem gravar
-function EditarAlunoModal({ aluno, onSalvo, onCancelar, onSessaoExpirada }) {
+//   onRecarregar: pede à lista para recarregar sem fechar o popup (usado quando só uma parte foi gravada)
+function EditarAlunoModal({ aluno, onSalvo, onCancelar, onRecarregar, onSessaoExpirada }) {
   const dialogoRef = useRef(null)
+  // Os dados "de partida" para comparar com o que foi digitado. Mudam se uma parte da gravação der certo.
+  const [original, setOriginal] = useState(aluno)
   const [nome, setNome] = useState(aluno.nome)
   const [email, setEmail] = useState(aluno.email)
   const [dataNascimento, setDataNascimento] = useState(aluno.dataNascimento)
+  const [ativo, setAtivo] = useState(aluno.ativo)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
 
@@ -27,27 +31,43 @@ function EditarAlunoModal({ aluno, onSalvo, onCancelar, onSessaoExpirada }) {
     return () => dialogo.close()
   }, [])
 
-  // Botão Alterar só vale quando algo realmente mudou
-  const alterado =
-    nome.trim() !== aluno.nome || email.trim() !== aluno.email || dataNascimento !== aluno.dataNascimento
+  const dadosAlterados =
+    nome.trim() !== original.nome || email.trim() !== original.email || dataNascimento !== original.dataNascimento
+  const situacaoAlterada = ativo !== original.ativo
 
   function cancelar() {
     if (!salvando) onCancelar() // não deixa fechar no meio de um salvamento
   }
 
+  // A API tem duas rotas diferentes: PUT para nome, e-mail e data; PATCH para ativar ou desativar.
+  // Então gravamos em até duas chamadas, uma depois da outra.
   async function aoEnviar(evento) {
     evento.preventDefault()
     setErro('')
     setSalvando(true)
+    let gravouAlgo = false
     try {
-      await atualizarAluno(aluno.id, { nome: nome.trim(), email: email.trim(), dataNascimento })
+      if (dadosAlterados) {
+        await atualizarAluno(original.id, { nome: nome.trim(), email: email.trim(), dataNascimento })
+        setOriginal((o) => ({ ...o, nome: nome.trim(), email: email.trim(), dataNascimento }))
+        gravouAlgo = true
+      }
+      if (situacaoAlterada) {
+        await alterarSituacao(original.id, ativo)
+      }
       onSalvo()
     } catch (e) {
       if (e.status === 401) {
         onSessaoExpirada() // token expirado: volta para o login
         return
       }
-      setErro(e.message) // ex.: 409 "Já existe um aluno cadastrado com este e-mail"
+      // Se os dados já foram gravados e só a situação falhou, avisa e atualiza a lista por trás do popup
+      if (gravouAlgo) {
+        setErro(`Os dados foram salvos, mas a situação não mudou: ${e.message}`)
+        onRecarregar()
+      } else {
+        setErro(e.message) // ex.: 409 "Já existe um aluno cadastrado com este e-mail"
+      }
       setSalvando(false)
     }
   }
@@ -106,6 +126,19 @@ function EditarAlunoModal({ aluno, onSalvo, onCancelar, onSessaoExpirada }) {
           />
         </div>
 
+        <div className="editar-campo">
+          <label htmlFor="editar-situacao">Situação</label>
+          {/* o select trabalha com texto ("ativo"/"inativo"); convertemos de e para o boolean que a API usa */}
+          <select
+            id="editar-situacao"
+            value={ativo ? 'ativo' : 'inativo'}
+            onChange={(evento) => setAtivo(evento.target.value === 'ativo')}
+          >
+            <option value="ativo">Ativo</option>
+            <option value="inativo">Inativo</option>
+          </select>
+        </div>
+
         {erro && (
           <p className="editar-erro" role="alert">
             {erro}
@@ -116,7 +149,7 @@ function EditarAlunoModal({ aluno, onSalvo, onCancelar, onSessaoExpirada }) {
           <button type="button" className="editar-cancelar" onClick={cancelar} disabled={salvando}>
             Cancelar
           </button>
-          <button type="submit" className="editar-alterar" disabled={salvando || !alterado}>
+          <button type="submit" className="editar-alterar" disabled={salvando || !(dadosAlterados || situacaoAlterada)}>
             {salvando ? 'Alterando...' : 'Alterar'}
           </button>
         </div>

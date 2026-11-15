@@ -14,7 +14,7 @@ Aqui está o **mapa para reproduzir**: o que fazer, em que ordem, como saber que
 
 ---
 
-## Como ler (e como usar)
+## Como ler (e como usar)fico
 
 - **Cada passo tem:** o objetivo, como fazer, **Pronto quando** (a prova de que funcionou) e **Armadilhas** (o que deu errado de verdade).
 - **A regra de ouro do projeto:** nenhum passo está "feito" sem prova. Prova é teste passando, resposta real de HTTP, linha de log ou estado do banco, e não "eu acho que funciona". Depois da prova, **sabotar de propósito** (quebrar o código de um jeito conhecido e ver o teste falhar), para ter certeza de que o teste não é decorativo.

@@ -4,6 +4,8 @@ import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -49,7 +51,10 @@ public class AlunoService {
 				? repository.findByNomeContainingIgnoreCase(filtroNome, ordenado)
 				: repository.findByNomeContainingIgnoreCaseAndAtivo(filtroNome, ativo, ordenado);
 	}
-
+	// Cache no Redis (RedisConfig), chave aluno::<id>, 10 min. Quem altera o aluno apaga a chave (@CacheEvict abaixo).
+	// As chamadas internas (this.buscar em atualizar/ativar/desativar) NAO passam pelo cache (auto-chamada ignora o proxy):
+	// elas precisam da entidade gerenciada pelo JPA, nunca de uma cópia vinda do Redis.
+	@Cacheable(cacheNames = "aluno", key = "#id")
 	@Transactional(readOnly = true)
 	public Aluno buscar(Long id) {
 		validarId(id);
@@ -57,6 +62,7 @@ public class AlunoService {
 				.orElseThrow(() -> new ResourceNotFoundException("Aluno não encontrado com id=" + id));
 	}
 
+	@CacheEvict(cacheNames = "aluno", key = "#id")
 	@Transactional
 	public Aluno atualizar(Long id, Aluno dados) {
 		Aluno aluno = buscar(id);
@@ -69,6 +75,7 @@ public class AlunoService {
 		return salvo;
 	}
 
+	@CacheEvict(cacheNames = "aluno", key = "#id")
 	@Transactional
 	public Aluno desativar(Long id) {
 		Aluno aluno = buscar(id);
@@ -78,6 +85,7 @@ public class AlunoService {
 		return salvo;
 	}
 
+	@CacheEvict(cacheNames = "aluno", key = "#id")
 	@Transactional
 	public Aluno ativar(Long id) {
 		Aluno aluno = buscar(id);
@@ -87,6 +95,7 @@ public class AlunoService {
 		return salvo;
 	}
 
+	@CacheEvict(cacheNames = "aluno", key = "#id")
 	@Transactional
 	public void remover(Long id) {
 		validarId(id);

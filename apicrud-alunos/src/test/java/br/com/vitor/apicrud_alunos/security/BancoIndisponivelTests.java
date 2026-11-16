@@ -127,7 +127,7 @@ class BancoIndisponivelTests {
 	void listarComOBancoForaDa503() throws Exception {
 		User fulano = usuario("fulano", "USER");
 		when(userRepository.findByUserName("fulano")).thenReturn(Optional.of(fulano));
-		when(alunoRepository.findByNomeContainingIgnoreCase(anyString(), any(Pageable.class))).thenThrow(bancoFora());
+		when(alunoRepository.findByNomeStartingWithIgnoreCase(anyString(), any(Pageable.class))).thenThrow(bancoFora());
 
 		esperar503(mockMvc.perform(get("/alunos").header(HttpHeaders.AUTHORIZATION, bearer(provider.createTokenPair(fulano).accessToken()))));
 	}
@@ -159,7 +159,7 @@ class BancoIndisponivelTests {
 	void erroQueNaoEDoBancoForaDoArContinuaSendo500() throws Exception {
 		User fulano = usuario("fulano", "USER");
 		when(userRepository.findByUserName("fulano")).thenReturn(Optional.of(fulano));
-		when(alunoRepository.findByNomeContainingIgnoreCase(anyString(), any(Pageable.class)))
+		when(alunoRepository.findByNomeStartingWithIgnoreCase(anyString(), any(Pageable.class)))
 				.thenThrow(new TransactionSystemException("Could not commit JPA transaction"));
 		String token = bearer(provider.createTokenPair(fulano).accessToken());
 

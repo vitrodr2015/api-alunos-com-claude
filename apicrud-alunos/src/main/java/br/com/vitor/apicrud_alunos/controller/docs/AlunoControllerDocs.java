@@ -41,7 +41,7 @@ public interface AlunoControllerDocs {
 	@ApiResponse(responseCode = "401", description = "Sem token, token inválido ou vencido",
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	PagedModel<EntityModel<AlunoResponse>> listar(
-			@Parameter(description = "Parte do nome (contém, sem diferenciar maiúsculas). Ex.: ana") String nome,
+			@Parameter(description = "Início do nome (começa com, sem diferenciar maiúsculas). Ex.: ana acha Ana Souza, mas não Mariana") String nome,
 			@Parameter(description = "Filtra por situação: true (ativos) ou false (inativos). Sem o parâmetro, traz todos.") Boolean ativo,
 			@ParameterObject Pageable pageable);
 

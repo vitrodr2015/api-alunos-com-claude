@@ -48,8 +48,8 @@ public class AlunoService {
 		Pageable ordenado = comDesempatePeloId(pageable);
 
 		return ativo == null
-				? repository.findByNomeContainingIgnoreCase(filtroNome, ordenado)
-				: repository.findByNomeContainingIgnoreCaseAndAtivo(filtroNome, ativo, ordenado);
+				? repository.findByNomeStartingWithIgnoreCase(filtroNome, ordenado)
+				: repository.findByNomeStartingWithIgnoreCaseAndAtivo(filtroNome, ativo, ordenado);
 	}
 	// Cache no Redis (RedisConfig), chave aluno::<id>, 10 min. Quem altera o aluno apaga a chave (@CacheEvict abaixo).
 	// As chamadas internas (this.buscar em atualizar/ativar/desativar) NAO passam pelo cache (auto-chamada ignora o proxy):

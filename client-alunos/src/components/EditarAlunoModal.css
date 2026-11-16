@@ -1,0 +1,110 @@
+/* O <dialog> nativo fica centralizado na tela; o ::backdrop é o fundo escurecido atrás dele.
+   Sem padding no próprio <dialog>: assim um clique no "fundo" é um clique no <dialog>, e não no formulário. */
+.editar-dialogo {
+  width: min(440px, calc(100vw - 2rem));
+  padding: 0;
+  border: none;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #1f2937;
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.3);
+}
+
+.editar-dialogo::backdrop {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.editar-formulario {
+  padding: 1.75rem 1.75rem 1.5rem;
+}
+
+.editar-formulario h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.editar-id {
+  margin: 0.15rem 0 1.5rem;
+  color: #9ca3af;
+  font-size: 0.85rem;
+}
+
+.editar-campo {
+  margin-bottom: 1.1rem;
+}
+
+.editar-campo label {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: #374151;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.editar-campo input {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.editar-campo input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.editar-erro {
+  margin: 0 0 1.1rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.875rem;
+}
+
+.editar-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.5rem;
+}
+
+.editar-acoes button {
+  padding: 0.6rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.editar-cancelar {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+}
+
+.editar-cancelar:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.editar-alterar {
+  border: 1px solid #2563eb;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.editar-alterar:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.editar-acoes button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

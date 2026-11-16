@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { listarAlunos } from '../api/alunos'
+import EditarAlunoModal from '../components/EditarAlunoModal'
 import Paginacao from '../components/Paginacao'
 import './Alunos.css'
 
@@ -51,6 +52,8 @@ function Alunos({ onSair }) {
   const [nome, setNome] = useState('') // o termo realmente usado na busca (só muda depois de uma pausa na digitação)
   const [situacao, setSituacao] = useState('todos') // 'todos' | 'ativos' | 'inativos'
   const [ordem, setOrdem] = useState(ORDEM_PADRAO) // { campo, direcao }
+  const [alunoEditando, setAlunoEditando] = useState(null) // o aluno cujo popup está aberto (null = fechado)
+  const [versao, setVersao] = useState(0) // soma 1 para forçar o recarregamento da lista (ex.: depois de editar)
   const [alunos, setAlunos] = useState([])
   const [info, setInfo] = useState(null) // { totalElements, totalPages, ... }
   const [carregando, setCarregando] = useState(true)
@@ -101,7 +104,7 @@ function Alunos({ onSair }) {
     return () => {
       cancelado = true
     }
-  }, [pagina, tamanho, nome, situacao, ordem, onSair])
+  }, [pagina, tamanho, nome, situacao, ordem, versao, onSair])
 
   const totalPaginas = info?.totalPages ?? 0
 
@@ -222,20 +225,21 @@ function Alunos({ onSair }) {
                 Nascimento
               </CabecalhoOrdenavel>
               <th>Situação</th>
+              <th className="alunos-col-acoes">Ações</th>
             </tr>
           </thead>
           <tbody>
             {/* "Carregando..." só na primeira vez, quando ainda não há linhas para mostrar */}
             {carregando && alunos.length === 0 && (
               <tr>
-                <td colSpan="4" className="alunos-aviso">
+                <td colSpan="5" className="alunos-aviso">
                   Carregando...
                 </td>
               </tr>
             )}
             {!carregando && alunos.length === 0 && !erro && (
               <tr>
-                <td colSpan="4" className="alunos-aviso">
+                <td colSpan="5" className="alunos-aviso">
                   {nome ? `Nenhum aluno encontrado para “${nome}”.` : 'Nenhum aluno encontrado.'}
                 </td>
               </tr>
@@ -261,6 +265,15 @@ function Alunos({ onSair }) {
                   <span className={aluno.ativo ? 'alunos-selo alunos-selo-ativo' : 'alunos-selo'}>
                     {aluno.ativo ? 'Ativo' : 'Inativo'}
                   </span>
+                </td>
+                <td className="alunos-col-acoes">
+                  <button
+                    className="alunos-botao-editar"
+                    onClick={() => setAlunoEditando(aluno)}
+                    aria-label={`Editar ${aluno.nome}`}
+                  >
+                    Editar
+                  </button>
                 </td>
               </tr>
             ))}
@@ -288,6 +301,20 @@ function Alunos({ onSair }) {
           </footer>
         )}
       </div>
+
+      {/* O popup só existe na tela enquanto houver um aluno sendo editado. "key" garante campos novos a cada aluno. */}
+      {alunoEditando && (
+        <EditarAlunoModal
+          key={alunoEditando.id}
+          aluno={alunoEditando}
+          onCancelar={() => setAlunoEditando(null)}
+          onSalvo={() => {
+            setAlunoEditando(null)
+            setVersao((v) => v + 1) // recarrega a página atual para mostrar os dados alterados
+          }}
+          onSessaoExpirada={onSair}
+        />
+      )}
     </div>
   )
 }

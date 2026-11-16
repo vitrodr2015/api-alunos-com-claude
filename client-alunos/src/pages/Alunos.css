@@ -245,6 +245,29 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Coluna de ações (botão Editar em cada linha) */
+.alunos-tabela .alunos-col-acoes {
+  width: 6rem;
+  text-align: right;
+}
+
+.alunos-botao-editar {
+  padding: 0.4rem 0.85rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #2563eb;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.alunos-botao-editar:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
 /* Aluno: avatar + nome em cima, e-mail embaixo */
 .alunos-pessoa {
   display: flex;

@@ -52,10 +52,57 @@
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.editar-campo input:focus {
+.editar-campo input:focus,
+.editar-campo select:focus {
   outline: none;
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.editar-campo select {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+/* Texto do popup de exclusão */
+.editar-texto {
+  margin: 0.75rem 0 0;
+  color: #374151;
+  line-height: 1.5;
+}
+
+/* Botão vermelho da exclusão */
+.editar-excluir {
+  border: 1px solid #dc2626;
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.editar-excluir:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+/* Campo com valor inválido: borda vermelha e a mensagem logo abaixo */
+.editar-campo .editar-input-invalido,
+.editar-campo .editar-input-invalido:focus {
+  border-color: #dc2626;
+}
+
+.editar-campo .editar-input-invalido:focus {
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
+}
+
+.editar-campo-erro {
+  display: block;
+  margin-top: 0.35rem;
+  color: #b91c1c;
+  font-size: 0.8rem;
 }
 
 .editar-erro {

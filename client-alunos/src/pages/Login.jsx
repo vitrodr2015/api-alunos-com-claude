@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { entrar } from '../api/auth'
+import { useSessao } from '../auth/SessaoContext'
 import './Login.css'
 
 // Um componente é uma função que devolve o que aparece na tela (JSX).
-// "onLogin" é uma função que o componente pai (App) nos entrega; chamamos quando o login dá certo.
-function Login({ onLogin }) {
+// Quando o login dá certo, guardamos a sessão; o App percebe que há alguém logado e leva para /alunos.
+function Login() {
+  const sessao = useSessao()
   // useState guarda um valor e redesenha a tela quando ele muda: [valor, função para trocar o valor]
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -17,13 +19,9 @@ function Login({ onLogin }) {
     setCarregando(true)
     try {
       const tokens = await entrar(username, password)
-      // localStorage é simples para estudar, mas fica exposto a XSS (veja a discussão sobre onde guardar o token)
-      localStorage.setItem('accessToken', tokens.accessToken)
-      localStorage.setItem('refreshToken', tokens.refreshToken)
-      onLogin()
+      sessao.entrar(tokens) // guarda os tokens (localStorage) e passa a saber quem está logado
     } catch (e) {
       setErro(e.message)
-    } finally {
       setCarregando(false)
     }
   }

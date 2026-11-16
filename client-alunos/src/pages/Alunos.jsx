@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react'
-import { listarAlunos } from '../api/alunos'
+import { Link } from 'react-router'
+import { alterarSituacao, listarAlunos } from '../api/alunos'
+import { useSessao } from '../auth/SessaoContext'
 import EditarAlunoModal from '../components/EditarAlunoModal'
+import ExcluirAlunoModal from '../components/ExcluirAlunoModal'
+import NovoAlunoModal from '../components/NovoAlunoModal'
 import Paginacao from '../components/Paginacao'
+import { formatarData, iniciais } from '../utils/formatos'
 import './Alunos.css'
 
 const TAMANHOS_PAGINA = [10, 20, 50] // 50 é o máximo que a API aceita (acima disso ela reduz para 50)
@@ -13,21 +18,6 @@ const SITUACOES = [
 ]
 
 const ORDEM_PADRAO = { campo: 'id', direcao: 'asc' }
-
-// "01/12/2000" a partir de "2000-12-01". Não usamos new Date() de propósito: ele converteria
-// o texto para UTC e, em fusos como o do Brasil, mostraria o dia anterior.
-function formatarData(iso) {
-  const [ano, mes, dia] = iso.split('-')
-  return `${dia}/${mes}/${ano}`
-}
-
-// "Ana Souza" -> "AS" (primeira letra do primeiro e do último nome)
-function iniciais(nome) {
-  const partes = nome.trim().split(/\s+/)
-  const primeira = partes[0]?.[0] ?? ''
-  const ultima = partes.length > 1 ? partes[partes.length - 1][0] : ''
-  return (primeira + ultima).toUpperCase()
-}
 
 // Cabeçalho de coluna clicável: mostra ▲ ou ▼ na coluna que está ordenando a tabela.
 function CabecalhoOrdenavel({ campo, ordem, onOrdenar, className, children }) {
@@ -45,7 +35,11 @@ function CabecalhoOrdenavel({ campo, ordem, onOrdenar, className, children }) {
   )
 }
 
-function Alunos({ onSair }) {
+function Alunos() {
+  // sair: encerra a sessão (usado quando a API devolve 401 e nem a renovação do token funciona)
+  // ehAdmin: só ADMIN pode excluir (a API responderia 403 para os demais)
+  const { sair: onSair, ehAdmin } = useSessao()
+  const [alternandoId, setAlternandoId] = useState(null) // id do aluno cuja situação está sendo trocada na linha
   const [pagina, setPagina] = useState(0) // número da página atual (começa em 0, como na API)
   const [tamanho, setTamanho] = useState(10) // alunos por página
   const [busca, setBusca] = useState('') // o que está digitado no campo (muda a cada tecla)
@@ -53,11 +47,21 @@ function Alunos({ onSair }) {
   const [situacao, setSituacao] = useState('todos') // 'todos' | 'ativos' | 'inativos'
   const [ordem, setOrdem] = useState(ORDEM_PADRAO) // { campo, direcao }
   const [alunoEditando, setAlunoEditando] = useState(null) // o aluno cujo popup está aberto (null = fechado)
+  const [alunoExcluindo, setAlunoExcluindo] = useState(null) // o aluno cuja confirmação de exclusão está aberta
+  const [cadastrando, setCadastrando] = useState(false) // popup de novo aluno aberto?
+  const [mensagem, setMensagem] = useState('') // aviso de sucesso (ex.: "Aluno cadastrado"), some sozinho
   const [versao, setVersao] = useState(0) // soma 1 para forçar o recarregamento da lista (ex.: depois de editar)
   const [alunos, setAlunos] = useState([])
   const [info, setInfo] = useState(null) // { totalElements, totalPages, ... }
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
+
+  // O aviso de sucesso desaparece depois de 5 segundos
+  useEffect(() => {
+    if (!mensagem) return
+    const temporizador = setTimeout(() => setMensagem(''), 5000)
+    return () => clearTimeout(temporizador)
+  }, [mensagem])
 
   // Debounce: espera 400 ms sem digitar antes de buscar. Sem isso, cada tecla dispararia uma chamada à API.
   // O return limpa o temporizador anterior; se o usuário digitar de novo antes dos 400 ms, a contagem recomeça.
@@ -140,6 +144,24 @@ function Alunos({ onSair }) {
     setPagina(0)
   }
 
+  // Interruptor da linha: troca a situação e recarrega a lista (se o filtro for "Ativos", a linha some, como esperado)
+  async function alternarSituacao(aluno) {
+    setErro('')
+    setAlternandoId(aluno.id)
+    try {
+      await alterarSituacao(aluno.id, !aluno.ativo)
+      setVersao((v) => v + 1)
+    } catch (e) {
+      if (e.status === 401) {
+        onSair()
+        return
+      }
+      setErro(e.message)
+    } finally {
+      setAlternandoId(null)
+    }
+  }
+
   // "Mostrando 11–20 de 404"
   const primeiro = info && info.totalElements > 0 ? pagina * tamanho + 1 : 0
   const ultimo = info ? Math.min((pagina + 1) * tamanho, info.totalElements) : 0
@@ -163,10 +185,18 @@ function Alunos({ onSair }) {
           <h1>Alunos</h1>
           {info && <p className="alunos-subtitulo">{subtitulo}</p>}
         </div>
-        <button className="alunos-botao-sair" onClick={onSair}>
-          Sair
-        </button>
+        <div className="alunos-cabecalho-acoes">
+          <button className="alunos-botao-novo" onClick={() => setCadastrando(true)}>
+            + Novo aluno
+          </button>
+        </div>
       </header>
+
+      {mensagem && (
+        <p className="alunos-sucesso" role="status">
+          {mensagem}
+        </p>
+      )}
 
       {erro && (
         <p className="alunos-erro" role="alert">
@@ -180,8 +210,8 @@ function Alunos({ onSair }) {
             type="search"
             value={busca}
             onChange={(evento) => setBusca(evento.target.value)}
-            placeholder="Buscar aluno por nome"
-            aria-label="Buscar aluno por nome"
+            placeholder="Buscar pelo início do nome"
+            aria-label="Buscar aluno pelo início do nome"
           />
           {busca && (
             <button className="alunos-busca-limpar" onClick={() => setBusca('')} aria-label="Limpar busca">
@@ -255,16 +285,32 @@ function Alunos({ onSair }) {
                       {iniciais(aluno.nome)}
                     </span>
                     <div>
-                      <div className="alunos-nome">{aluno.nome}</div>
+                      {/* Link troca de página sem recarregar o navegador: /alunos/12 mostra o detalhe */}
+                      <Link className="alunos-nome" to={`/alunos/${aluno.id}`}>
+                        {aluno.nome}
+                      </Link>
                       <div className="alunos-email">{aluno.email}</div>
                     </div>
                   </div>
                 </td>
                 <td>{formatarData(aluno.dataNascimento)}</td>
                 <td>
-                  <span className={aluno.ativo ? 'alunos-selo alunos-selo-ativo' : 'alunos-selo'}>
-                    {aluno.ativo ? 'Ativo' : 'Inativo'}
-                  </span>
+                  <div className="alunos-situacao-celula">
+                    {/* interruptor: clicar ativa ou desativa o aluno na hora (PATCH /enable ou /disable) */}
+                    <button
+                      role="switch"
+                      aria-checked={aluno.ativo}
+                      aria-label={`${aluno.ativo ? 'Desativar' : 'Ativar'} ${aluno.nome}`}
+                      className={aluno.ativo ? 'alunos-switch alunos-switch-ligado' : 'alunos-switch'}
+                      onClick={() => alternarSituacao(aluno)}
+                      disabled={alternandoId === aluno.id}
+                    >
+                      <span className="alunos-switch-bolinha" />
+                    </button>
+                    <span className={aluno.ativo ? 'alunos-selo alunos-selo-ativo' : 'alunos-selo'}>
+                      {aluno.ativo ? 'Ativo' : 'Inativo'}
+                    </span>
+                  </div>
                 </td>
                 <td className="alunos-col-acoes">
                   <button
@@ -274,6 +320,16 @@ function Alunos({ onSair }) {
                   >
                     Editar
                   </button>
+                  {/* só ADMIN vê o Excluir: a API recusaria (403) quem não tem esse perfil */}
+                  {ehAdmin && (
+                    <button
+                      className="alunos-botao-excluir"
+                      onClick={() => setAlunoExcluindo(aluno)}
+                      aria-label={`Excluir ${aluno.nome}`}
+                    >
+                      Excluir
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -311,6 +367,35 @@ function Alunos({ onSair }) {
           onSalvo={() => {
             setAlunoEditando(null)
             setVersao((v) => v + 1) // recarrega a página atual para mostrar os dados alterados
+          }}
+          onRecarregar={() => setVersao((v) => v + 1)}
+          onSessaoExpirada={onSair}
+        />
+      )}
+
+      {cadastrando && (
+        <NovoAlunoModal
+          onCancelar={() => setCadastrando(false)}
+          onCriado={(criado) => {
+            setCadastrando(false)
+            setMensagem(`Aluno “${criado.nome}” cadastrado com sucesso (#${criado.id}).`)
+            setVersao((v) => v + 1) // recarrega a lista; o aluno novo tem o maior id (última página na ordem padrão)
+          }}
+          onSessaoExpirada={onSair}
+        />
+      )}
+
+      {alunoExcluindo && (
+        <ExcluirAlunoModal
+          key={alunoExcluindo.id}
+          aluno={alunoExcluindo}
+          onCancelar={() => setAlunoExcluindo(null)}
+          onExcluido={() => {
+            setAlunoExcluindo(null)
+            // Se era o único aluno da última página, essa página deixa de existir: volta uma página.
+            // Senão, só recarrega a página atual.
+            if (alunos.length === 1 && pagina > 0) setPagina(pagina - 1)
+            else setVersao((v) => v + 1)
           }}
           onSessaoExpirada={onSair}
         />

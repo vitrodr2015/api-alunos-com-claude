@@ -1,0 +1,84 @@
+.topo {
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.topo-conteudo {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
+}
+
+.topo-marca {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.topo-menu {
+  display: flex;
+  flex: 1;
+  gap: 0.25rem;
+}
+
+.topo-menu a {
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  color: #4b5563;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: background 0.12s, color 0.12s;
+}
+
+.topo-menu a:hover {
+  background: #f3f4f6;
+}
+
+.topo-menu a.ativo {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.topo-usuario {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.topo-nome {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #374151;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.topo-selo {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #e0e7ff;
+  color: #3730a3;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.topo-sair {
+  padding: 0.4rem 0.95rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #374151;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.topo-sair:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
